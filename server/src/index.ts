@@ -36,6 +36,12 @@ interface ErrorPayload {
   details?: unknown;
 }
 
+interface MovePayload {
+  roomId: SessionId;
+  playerId: PlayerId;
+  move?: unknown;
+}
+
 const socketMembershipBySocket = new Map<WebSocket, SocketMembership>();
 const socketsByRoom = new Map<SessionId, Set<WebSocket>>();
 
@@ -61,6 +67,9 @@ wss.on("connection", (socket: WebSocket) => {
         return;
       case MESSAGE_TYPES.READY:
         handleReady(socket, message);
+        return;
+      case MESSAGE_TYPES.MOVE:
+        handleMove(socket, message);
         return;
       default:
         sendError(
@@ -224,11 +233,58 @@ function handleReady(socket: WebSocket, message: IncomingMessage): void {
     return;
   }
 
+  const readyResult = roomManager.setPlayerReady({
+    sessionId: payload.roomId,
+    playerId: payload.playerId,
+    ready: payload.ready,
+  });
+  if (!readyResult.ok) {
+    sendError(socket, readyResult.error, readyResult.message, payload.roomId);
+    return;
+  }
+
+  broadcastRoomState(payload.roomId);
+
+  if (readyResult.data.activated) {
+    broadcastInitGame(payload.roomId);
+  }
+}
+
+function handleMove(socket: WebSocket, message: IncomingMessage): void {
+  const payloadResult = validateMovePayload(message);
+  if (!payloadResult.ok) {
+    sendError(socket, ERROR_CODES.INVALID_PAYLOAD, payloadResult.message);
+    return;
+  }
+
+  const payload = payloadResult.payload;
+  const membership = socketMembershipBySocket.get(socket);
+  if (
+    !membership ||
+    membership.roomId !== payload.roomId ||
+    membership.playerId !== payload.playerId
+  ) {
+    sendError(
+      socket,
+      ERROR_CODES.SOCKET_NOT_ASSIGNED,
+      "Move request requires socket membership in the target room",
+      payload.roomId,
+    );
+    return;
+  }
+
+  const activeResult = roomManager.canAcceptMoves(payload.roomId);
+  if (!activeResult.ok) {
+    sendError(socket, activeResult.error, activeResult.message, payload.roomId);
+    return;
+  }
+
   sendError(
     socket,
     ERROR_CODES.NOT_IMPLEMENTED,
-    "Ready handling will be implemented in the next milestone",
+    "Move application is not implemented yet",
     payload.roomId,
+    payload.move,
   );
 }
 
@@ -425,6 +481,35 @@ function validateReadyPayload(
   };
 }
 
+function validateMovePayload(
+  message: IncomingMessage,
+): { ok: true; payload: MovePayload } | { ok: false; message: string } {
+  if (!isRecord(message.payload)) {
+    return { ok: false, message: "move requires an object payload" };
+  }
+
+  const roomId = message.payload.roomId;
+  const playerId = message.payload.playerId;
+  if (typeof roomId !== "string" || roomId.length === 0) {
+    return { ok: false, message: "move payload.roomId must be a non-empty string" };
+  }
+  if (typeof playerId !== "string" || playerId.length === 0) {
+    return { ok: false, message: "move payload.playerId must be a non-empty string" };
+  }
+  if (message.roomId && message.roomId !== roomId) {
+    return { ok: false, message: "move roomId and payload.roomId must match" };
+  }
+
+  return {
+    ok: true,
+    payload: {
+      roomId,
+      playerId,
+      move: message.payload.move,
+    },
+  };
+}
+
 function sendError(
   socket: WebSocket,
   code: ErrorCode | RoomManagerErrorCode,
@@ -452,6 +537,27 @@ function broadcastRoomState(roomId: SessionId): void {
   const room = roomManager.getRoom(roomId);
   for (const roomSocket of roomSockets) {
     sendRoomState(roomSocket, roomId, room);
+  }
+}
+
+function broadcastInitGame(roomId: SessionId): void {
+  const roomSockets = socketsByRoom.get(roomId);
+  if (!roomSockets || roomSockets.size === 0) {
+    return;
+  }
+
+  const room = roomManager.getRoom(roomId);
+  const payload = {
+    room,
+    startedAt: Date.now(),
+  };
+
+  for (const roomSocket of roomSockets) {
+    send(roomSocket, {
+      type: MESSAGE_TYPES.INIT_GAME,
+      roomId,
+      payload,
+    });
   }
 }
 

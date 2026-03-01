@@ -18,9 +18,11 @@ export const ROOM_MANAGER_ERRORS = {
   ROOM_ALREADY_EXISTS: "room_already_exists",
   ROOM_NOT_FOUND: "room_not_found",
   ROOM_CLOSED: "room_closed",
+  ROOM_NOT_ACTIVE: "room_not_active",
   ROOM_FULL: "room_full",
   SPECTATOR_CAP_REACHED: "spectator_cap_reached",
   PLAYER_ALREADY_IN_ROOM: "player_already_in_room",
+  PLAYER_NOT_IN_ROOM: "player_not_in_room",
   SEAT_TAKEN: "seat_taken",
 } as const;
 
@@ -59,6 +61,17 @@ export interface JoinRoomOutput {
 export interface LeaveRoomOutput {
   roomClosed: boolean;
   room: RoomContract | null;
+}
+
+export interface ReadyInput {
+  sessionId: SessionId;
+  playerId: PlayerId;
+  ready: boolean;
+}
+
+export interface ReadyOutput {
+  room: RoomContract;
+  activated: boolean;
 }
 
 export class RoomManager {
@@ -207,6 +220,69 @@ export class RoomManager {
     return Array.from(this.rooms.values()).map((room) => this.cloneRoom(room));
   }
 
+  setPlayerReady(input: ReadyInput): RoomManagerResult<ReadyOutput> {
+    const room = this.rooms.get(input.sessionId);
+    if (!room) {
+      return this.fail(
+        ROOM_MANAGER_ERRORS.ROOM_NOT_FOUND,
+        `Room '${input.sessionId}' does not exist`,
+      );
+    }
+
+    if (room.state === ROOM_STATES.CLOSED) {
+      return this.fail(
+        ROOM_MANAGER_ERRORS.ROOM_CLOSED,
+        `Room '${input.sessionId}' is closed`,
+      );
+    }
+
+    const participant = room.participants.find(
+      (entry) => entry.playerId === input.playerId,
+    );
+    if (!participant) {
+      return this.fail(
+        ROOM_MANAGER_ERRORS.PLAYER_NOT_IN_ROOM,
+        `Player '${input.playerId}' is not in room '${input.sessionId}'`,
+      );
+    }
+
+    participant.ready = input.ready;
+
+    const wasActive = room.state === ROOM_STATES.ACTIVE;
+    const shouldActivate = this.canActivateRoom(room);
+    if (!wasActive && shouldActivate) {
+      room.state = ROOM_STATES.ACTIVE;
+    }
+    if (wasActive && !shouldActivate) {
+      room.state = ROOM_STATES.WAITING;
+    }
+
+    room.updatedAt = Date.now();
+    return this.ok({
+      room: this.cloneRoom(room),
+      activated: !wasActive && room.state === ROOM_STATES.ACTIVE,
+    });
+  }
+
+  canAcceptMoves(sessionId: SessionId): RoomManagerResult<RoomContract> {
+    const room = this.rooms.get(sessionId);
+    if (!room) {
+      return this.fail(
+        ROOM_MANAGER_ERRORS.ROOM_NOT_FOUND,
+        `Room '${sessionId}' does not exist`,
+      );
+    }
+
+    if (room.state !== ROOM_STATES.ACTIVE) {
+      return this.fail(
+        ROOM_MANAGER_ERRORS.ROOM_NOT_ACTIVE,
+        `Room '${sessionId}' is not active`,
+      );
+    }
+
+    return this.ok(this.cloneRoom(room));
+  }
+
   private closeRoomInternal(sessionId: SessionId): RoomContract {
     const room = this.rooms.get(sessionId);
     if (!room) {
@@ -328,5 +404,22 @@ export class RoomManager {
 
   private fail(error: RoomManagerErrorCode, message: string): RoomManagerFailure {
     return { ok: false, error, message };
+  }
+
+  private canActivateRoom(room: RoomContract): boolean {
+    if (!room.seats.white || !room.seats.black) {
+      return false;
+    }
+
+    const whiteReady = room.participants.some(
+      (participant) =>
+        participant.slot === PLAYER_SLOTS.WHITE && participant.ready,
+    );
+    const blackReady = room.participants.some(
+      (participant) =>
+        participant.slot === PLAYER_SLOTS.BLACK && participant.ready,
+    );
+
+    return whiteReady && blackReady;
   }
 }

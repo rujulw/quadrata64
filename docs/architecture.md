@@ -1,96 +1,95 @@
 # Architecture
 
 ## Overview
-`quadrata64` is a monorepo with a React + Vite client and a Node.js + TypeScript WebSocket server (`ws`).
+`quadrata64` is a monorepo with a React + Vite client and a Node.js + TypeScript websocket server (`ws`).
 
-Current intent:
-- Real-time multiplayer chess over WebSockets.
-- Server-authoritative game state to prevent desync and enforce validity.
-- Deterministic move validation using `chess.js` (server as source of truth).
+Current model:
+- server-authoritative session state
+- typed websocket protocol boundary
+- waiting-room lifecycle with readiness-based activation
 
 ## Repository Structure
-- `client/`: React app (Vite), board UI, WebSocket client, local input handling.
-- `server/`: WebSocket server (`ws`), game session model, authoritative state + move validation.
-- `docs/`: architecture and planning docs.
+- `client/`: React app (Vite), board UI, websocket client integration.
+- `server/`: websocket server, protocol validation, room/session lifecycle.
+- `docs/`: design decisions, roadmap, architecture, and bug history.
 
 ## Runtime Architecture
 ### Frontend (`client`)
-Core modules (planned):
-- `src/lib/ws.ts`: WebSocket client + message send/receive utilities.
-- `src/state/game.ts`: client-side view state derived from server snapshots.
-- `src/routes/`: lobby and game routes.
-- `src/components/Board/`: board rendering + interaction.
-
-Data flow (target):
-1. Client connects to WebSocket server (`VITE_WS_URL`).
-2. Client joins or creates a room.
-3. Server sends an initial state snapshot.
-4. Client sends move intent (from-square, to-square, optional promotion).
-5. Server validates move via `chess.js`, updates authoritative state.
-6. Server broadcasts updated state snapshot to all room participants.
-7. Client renders board purely from the latest server snapshot.
+Target responsibilities:
+- open websocket connection
+- send intent messages (`join_room`, `leave_room`, `ready`, `move`)
+- render from server snapshots (`room_state`, `init_game`, future game-state updates)
 
 ### Backend (`server`)
-Core modules (planned):
-- `src/index.ts`: WebSocket server boot + connection lifecycle.
-- `src/protocol/`: message types and payload schemas.
-- `src/game/`: room + game session model.
-- `src/game/engine.ts`: `chess.js` wrapper for validation and state transitions.
+Current responsibilities:
+- parse and validate websocket message envelopes
+- validate payload boundaries per message type
+- route by message type in `src/index.ts`
+- maintain in-memory room lifecycle via `src/session/RoomManager.ts`
+- enforce session preconditions with typed error responses
 
-Data flow (target):
-1. Client `join_room` message arrives.
-2. Server associates socket with a room and initializes/loads a session.
-3. Client `move` message arrives (intent only).
-4. Server validates and applies move.
-5. Server broadcasts `state` update to room.
+## Session Lifecycle (Implemented)
+1. `join_room`:
+- creates room if missing
+- assigns player slot (`white`/`black`) or spectator policy outcome
+- binds socket membership to `(roomId, peerId)`
+- broadcasts `room_state`
+
+2. `leave_room`:
+- validates socket ownership
+- removes participant and seat/spectator mapping
+- auto-closes room when empty
+- broadcasts updated `room_state` or closed-room state
+
+3. `ready`:
+- validates socket ownership
+- updates participant readiness
+- transitions room `waiting -> active` when both seated players are ready
+- broadcasts `room_state`
+- emits `init_game` snapshot on activation edge
+
+4. `move`:
+- validates socket ownership and payload boundary
+- rejects if room is not active
+- move application path intentionally deferred to next milestone
 
 ## Synchronization Model
-- Server is authoritative for all chess state.
-- Clients do not apply moves locally as truth; they render from server snapshots.
-- Invalid moves are rejected server-side with an error response.
+- Server is source of truth for room/session state.
+- Clients never infer authoritative room state from local actions.
+- Invalid actions receive structured `error` messages with typed error codes.
 
-## Message Envelope (Planned)
-All messages follow:
-- `type`: message kind (join_room, state, move, error, etc.)
-- `roomId`: room identifier
-- `payload`: message-specific data
+## Message Envelope
+All messages use:
+- `type`: message kind
+- `roomId`: session identifier
+- `payload`: message-specific body
 
-## Current Gaps / Risks
-- No matchmaking layer yet (manual room creation/join only).
-- No persistence (sessions reset on server restart).
-- No reconnection strategy yet.
-- No clock/time-control implementation.
+Current server-handled inbound types:
+- `join_room`
+- `leave_room`
+- `ready`
+- `move` (gated, application deferred)
+
+Current outbound types:
+- `room_state`
+- `init_game`
+- `error`
+
+## Known Gaps
+- No chess move execution yet (`move` is only precondition-gated).
+- No persistence across server restarts.
+- No reconnect/session recovery path.
 - No automated tests yet.
-
-## Target Architecture
-### Short-term target
-- Implement room model + state snapshots.
-- Implement move validation and broadcast loop.
-- Implement minimal lobby -> game flow.
-
-### Near-term target
-- Add reconnection handling and basic session recovery.
-- Add time controls (increment/blitz).
-- Add persistence (optional) for finished games / history.
-- Add tests around protocol, state transitions, and move validity.
 
 ## Environment Variables
 ### Server
 - `PORT` (default `3000`)
-- `CLIENT_URL` (default `http://localhost:5173`)
 
 ### Client
 - `VITE_WS_URL` (default `ws://localhost:3000`)
 
 ## Development Commands
-### Setup
 - `make setup`
-
-### Run dev
 - `make dev`
-
-### Build
 - `make build`
-
-### Typecheck
 - `make typecheck`

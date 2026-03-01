@@ -28,6 +28,10 @@ Current responsibilities:
 - maintain in-memory room lifecycle via `src/session/RoomManager.ts`
 - enforce session preconditions with typed error responses
 
+In-progress game-core responsibilities:
+- define game domain contracts in `src/game/types.ts`
+- define protocol contracts for game lifecycle payloads in `src/protocol/types.ts`
+
 ## Session Lifecycle (Implemented)
 1. `join_room`:
 - creates room if missing
@@ -74,6 +78,7 @@ Current outbound types:
 - `room_state`
 - `init_game`
 - `error`
+- contract-ready (next behavior commit): `move_applied`, structured `game_over`
 
 ## Known Gaps
 - No chess move execution yet (`move` is only precondition-gated).

@@ -32,3 +32,20 @@ Impact:
 - Router broadcasts `room_state` after readiness changes.
 - Router emits `init_game` exactly on `waiting -> active` transition.
 - `move` requests are rejected with typed errors until room is active.
+
+---
+
+## 3. Game-Core Contracts Before Engine Wiring
+
+Decision:
+Define game domain types and protocol payload contracts before implementing chess engine execution.
+
+Why:
+- Prevents websocket handlers from hardcoding ad-hoc move and game-state shapes.
+- Makes outbound `init_game` and `game_over` payloads explicit and versionable.
+- Lets engine and router evolve independently behind a stable contract boundary.
+
+Impact:
+- Added `server/src/game/types.ts` for `GameSnapshot`, move input, status, and result contracts.
+- Added protocol payload types for `init_game`, move intent, move-applied, room-state, and `game_over`.
+- Next commits can focus on behavior implementation instead of reshaping message schemas.

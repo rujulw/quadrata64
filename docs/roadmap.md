@@ -13,6 +13,7 @@ Port the older websocket chess prototype into a typed, server-authoritative sess
 - [x] ready-check transition `waiting -> active`
 - [x] `init_game` broadcast on session activation
 - [x] move rejection while room is not active
+- [x] game-core domain and payload contracts (`GameSnapshot`, move intent, game-over payload)
 
 ## 1. Complete Current Branch (Final Impl + Docs)
 - Implement move application path behind active-session gate.

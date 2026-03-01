@@ -1,5 +1,13 @@
 # Bug Log
 
+## 2026-03-01 — Ambiguous game payload contracts blocked safe engine port
+- Symptom: Existing `init_game`/`move` flow lacked explicit authoritative snapshot and result payload schemas.
+- Root cause: Early websocket milestones focused on routing and room lifecycle before game-core contract modeling.
+- Fix: Introduced `game/types` and protocol payload contracts for move intent, snapshot broadcasts, and terminal outcomes before engine wiring.
+- Files: `server/src/game/types.ts`, `server/src/protocol/types.ts`
+
+---
+
 ## 2026-03-01 — Envelope accepted malformed payload shape
 - Symptom: Valid JSON with missing/invalid payload fields could pass parse and reach business logic.
 - Root cause: Initial websocket skeleton only parsed JSON without payload-level guards.

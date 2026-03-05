@@ -63,7 +63,7 @@ Why:
 - Guarantees a single authoritative game instance per active room.
 
 Impact:
-- Added `server/src/game/GameManager.ts` with typed `createGameForRoom`, `requireGame`, and `closeGame`.
+- Added `server/src/game/GameManager.ts` with typed `createGameForRoom`, `requireGame`, and `closeGameForRoom`.
 - Game creation enforces room preconditions (`active` state with both seated players).
 - Room-close handling can now deterministically remove game instances to prevent stale engine reuse.
 
@@ -100,3 +100,38 @@ Impact:
 - Router emits `game_over` immediately after the terminal `move_applied` snapshot.
 - Router maps engine `game_not_active` to protocol error `game_already_finished` for post-terminal move attempts.
 - Game registry remains session-scoped, and room-close paths continue to tear down game instances (`closeGameForRoom`).
+
+---
+
+## 7. Websocket Refactor: Router + Validators Split
+
+Decision:
+Move websocket handlers and validation logic out of `index.ts` into `ws/router.ts` and `ws/validators.ts`.
+
+Why:
+- Prevents entrypoint bloat as gameplay features expand.
+- Keeps transport orchestration separate from validation and domain services.
+- Lowers regression risk when adding new message types by localizing parsing/validation rules.
+
+Impact:
+- `index.ts` now performs only bootstrap and dependency wiring.
+- `ws/router.ts` owns connection, membership maps, and message-type handlers.
+- `ws/validators.ts` owns envelope parse and payload validation boundaries.
+
+---
+
+## 8. Legacy Port Decomposition (Old `Game`/`GameManager`)
+
+Decision:
+Port old behavior by responsibility, not by class copy, to avoid transport/state coupling.
+
+Why:
+- Old `Game.ts` mixed websocket side effects with game-state mutation.
+- Old `GameManager.ts` used pending-user matchmaking state that conflicts with room lifecycle ownership.
+- The new architecture needs deterministic room-activation boundaries, not opportunistic socket pairing.
+
+Impact:
+- Chess behavior is isolated in `GameEngine`.
+- Session game ownership is isolated in `GameManager` keyed by `sessionId`.
+- Room readiness and seat ownership remain isolated in `RoomManager`.
+- Router acts as an adapter layer only and no longer carries hidden matchmaking state.

@@ -17,12 +17,20 @@ Port the older websocket chess prototype into a typed, server-authoritative sess
 - [x] move application path behind active-session gate
 - [x] authoritative `move_applied` snapshot broadcasts
 - [x] terminal `game_over` broadcast and finished-game move freeze
+- [x] websocket handler/validator extraction (`ws/router.ts`, `ws/validators.ts`)
+- [x] final architecture docs pass for legacy-port decomposition and risk log
 
 ## 1. Complete Current Branch (Final Impl + Docs)
 - [x] Implement move application path behind active-session gate.
 - [x] Integrate chess engine state with `init_game` and post-move state broadcasts.
 - [x] Emit deterministic terminal-state `game_over` payload and freeze further moves.
+- [x] Extract websocket handlers/validators to keep index thin without behavior drift.
 - [x] Finalize consolidated docs commit (design + bug-log + roadmap + architecture).
+
+## Next Milestones (Immediate)
+- Reconnect/session recovery policy and resume semantics.
+- Unit tests for `RoomManager`, `GameManager`, and `GameEngine`.
+- Integration tests for websocket protocol happy path and typed error paths.
 
 ## 2. Post-MVP Hardening
 - Add reconnection strategy for transient disconnects.

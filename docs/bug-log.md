@@ -1,5 +1,21 @@
 # Bug Log
 
+## 2026-03-05 — Duplicate game creation risk on repeated activation edges
+- Symptom: Without a registry guard, repeated activation handling could create multiple engine instances for the same room.
+- Root cause: No single owner mapping from `sessionId` to active game instance.
+- Fix: Added `GameManager` registry keyed by `sessionId` and explicit `GAME_ALREADY_EXISTS` rejection.
+- Files: `server/src/game/GameManager.ts`
+
+---
+
+## 2026-03-05 — Orphaned game state risk after room lifecycle closure
+- Symptom: Game engines could remain in memory after a room is closed, risking stale state reuse and leaks.
+- Root cause: No explicit lifecycle endpoint for per-room game teardown.
+- Fix: Added `closeGame(sessionId)` and room-scoped registry ownership to support deterministic cleanup.
+- Files: `server/src/game/GameManager.ts`
+
+---
+
 ## 2026-03-01 — Ambiguous game payload contracts blocked safe engine port
 - Symptom: Existing `init_game`/`move` flow lacked explicit authoritative snapshot and result payload schemas.
 - Root cause: Early websocket milestones focused on routing and room lifecycle before game-core contract modeling.

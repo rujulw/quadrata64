@@ -49,3 +49,20 @@ Impact:
 - Added `server/src/game/types.ts` for `GameSnapshot`, move input, status, and result contracts.
 - Added protocol payload types for `init_game`, move intent, move-applied, room-state, and `game_over`.
 - Next commits can focus on behavior implementation instead of reshaping message schemas.
+
+---
+
+## 4. Session-Scoped Game Registry Ownership
+
+Decision:
+Store active game engines in a dedicated `GameManager` keyed by `sessionId`, and only create games from active room snapshots.
+
+Why:
+- Prevents transport handlers from owning engine lifecycle directly.
+- Avoids recreating old `pendingUser` coupling and race-prone matchmaking state.
+- Guarantees a single authoritative game instance per active room.
+
+Impact:
+- Added `server/src/game/GameManager.ts` with typed `createGameForRoom`, `requireGame`, and `closeGame`.
+- Game creation enforces room preconditions (`active` state with both seated players).
+- Room-close handling can now deterministically remove game instances to prevent stale engine reuse.

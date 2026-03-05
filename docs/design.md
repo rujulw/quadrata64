@@ -66,3 +66,20 @@ Impact:
 - Added `server/src/game/GameManager.ts` with typed `createGameForRoom`, `requireGame`, and `closeGame`.
 - Game creation enforces room preconditions (`active` state with both seated players).
 - Room-close handling can now deterministically remove game instances to prevent stale engine reuse.
+
+---
+
+## 5. Router as Transport Adapter Over Game Contracts
+
+Decision:
+Wire websocket `ready`/`move` handlers to `GameManager` + `GameEngine` and keep router logic as protocol translation only.
+
+Why:
+- Preserves clear ownership boundaries: room lifecycle in `RoomManager`, chess behavior in game-core, transport in router.
+- Replaces ad-hoc `init_game` payloads with authoritative server snapshots.
+- Keeps move failure modes explicit and typed (`room_not_active`, `game_not_found`, `wrong_turn_player`, `illegal_move`).
+
+Impact:
+- On activation edge, router creates/requires game and emits per-player `init_game` with `{ gameId, youAre, snapshot }`.
+- On `move`, router validates payload boundary, applies move via engine, and broadcasts `move_applied` with updated snapshot.
+- Room-close paths now tear down registry game state through `GameManager.closeGame`.

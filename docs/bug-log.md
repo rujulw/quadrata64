@@ -1,5 +1,29 @@
 # Bug Log
 
+## 2026-03-05 — `init_game` payload drift between clients and server authority
+- Symptom: Activation emitted an ad-hoc payload (`room`, `startedAt`) that did not match typed game contracts.
+- Root cause: Router init broadcast predated game snapshot wiring.
+- Fix: On activation edge, router now creates/requires game and sends typed per-player `init_game` with `gameId`, `youAre`, and authoritative `snapshot`.
+- Files: `server/src/index.ts`
+
+---
+
+## 2026-03-05 — Move route acknowledged active rooms but never applied moves
+- Symptom: `move` requests passed room-state gate but always returned `not_implemented`.
+- Root cause: Game registry and engine were not wired into websocket handlers.
+- Fix: Move handler now resolves session game, applies via `GameEngine`, and broadcasts typed `move_applied` snapshots.
+- Files: `server/src/index.ts`, `server/src/protocol/messages.ts`
+
+---
+
+## 2026-03-05 — Missing typed move failure semantics in router responses
+- Symptom: Wrong-turn and illegal moves were not represented as stable protocol error codes.
+- Root cause: Router had no mapping from engine failures to protocol-layer errors.
+- Fix: Added typed error codes (`game_not_found`, `wrong_turn_player`, `illegal_move`) and mapped engine/game-manager failures at the router boundary.
+- Files: `server/src/index.ts`, `server/src/protocol/messages.ts`
+
+---
+
 ## 2026-03-05 — Duplicate game creation risk on repeated activation edges
 - Symptom: Without a registry guard, repeated activation handling could create multiple engine instances for the same room.
 - Root cause: No single owner mapping from `sessionId` to active game instance.

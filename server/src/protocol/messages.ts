@@ -3,6 +3,7 @@ export const MESSAGE_TYPES = {
   LEAVE_ROOM: "leave_room",
   READY: "ready",
   INIT_GAME: "init_game",
+  MOVE_APPLIED: "move_applied",
   ROOM_STATE: "room_state",
   ERROR: "error",
   MOVE: "move",
@@ -19,6 +20,10 @@ export const ERROR_CODES = {
   UNSUPPORTED_MESSAGE_TYPE: "unsupported_message_type",
   SOCKET_ALREADY_ASSIGNED: "socket_already_assigned",
   SOCKET_NOT_ASSIGNED: "socket_not_assigned",
+  GAME_NOT_FOUND: "game_not_found",
+  GAME_ALREADY_FINISHED: "game_already_finished",
+  ILLEGAL_MOVE: "illegal_move",
+  WRONG_TURN_PLAYER: "wrong_turn_player",
   NOT_IMPLEMENTED: "not_implemented",
 } as const;
 

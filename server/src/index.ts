@@ -7,10 +7,22 @@ import {
 } from "./protocol/messages";
 import type {
   BaseMessage,
+  GameOverPayload,
+  InitGamePayload,
   JoinRoomPayload,
   LeaveRoomPayload,
+  MoveAppliedPayload,
+  MoveIntentPayload,
   ReadyPayload,
 } from "./protocol/types";
+import {
+  GAME_ENGINE_ERRORS,
+  type GameEngineErrorCode,
+} from "./game/GameEngine";
+import {
+  GameManager,
+  type GameManagerErrorCode,
+} from "./game/GameManager";
 import {
   ROOM_MANAGER_ERRORS,
   RoomManager,
@@ -22,6 +34,7 @@ const PORT = process.env.PORT ? Number(process.env.PORT) : 3000;
 
 const wss = new WebSocketServer({ port: PORT });
 const roomManager = new RoomManager({ maxPlayers: 2, maxSpectators: 0 });
+const gameManager = new GameManager();
 
 interface SocketMembership {
   roomId: SessionId;
@@ -31,15 +44,13 @@ interface SocketMembership {
 type IncomingMessage = BaseMessage<unknown>;
 
 interface ErrorPayload {
-  code: ErrorCode | RoomManagerErrorCode;
+  code:
+    | ErrorCode
+    | RoomManagerErrorCode
+    | GameManagerErrorCode
+    | GameEngineErrorCode;
   message: string;
   details?: unknown;
-}
-
-interface MovePayload {
-  roomId: SessionId;
-  playerId: PlayerId;
-  move?: unknown;
 }
 
 const socketMembershipBySocket = new Map<WebSocket, SocketMembership>();
@@ -197,6 +208,7 @@ function handleLeaveRoom(socket: WebSocket, message: IncomingMessage): void {
   unbindSocketMembership(socket);
 
   if (leaveResult.data.roomClosed) {
+    gameManager.closeGameForRoom(payload.roomId);
     const roomSockets = socketsByRoom.get(payload.roomId);
     if (roomSockets) {
       for (const roomSocket of roomSockets) {
@@ -246,7 +258,7 @@ function handleReady(socket: WebSocket, message: IncomingMessage): void {
   broadcastRoomState(payload.roomId);
 
   if (readyResult.data.activated) {
-    broadcastInitGame(payload.roomId);
+    createAndBroadcastInitGame(payload.roomId);
   }
 }
 
@@ -279,13 +291,78 @@ function handleMove(socket: WebSocket, message: IncomingMessage): void {
     return;
   }
 
-  sendError(
-    socket,
-    ERROR_CODES.NOT_IMPLEMENTED,
-    "Move application is not implemented yet",
+  const gameResult = gameManager.requireGame(payload.roomId);
+  if (!gameResult.ok) {
+    sendError(
+      socket,
+      ERROR_CODES.GAME_NOT_FOUND,
+      gameResult.message,
+      payload.roomId,
+    );
+    return;
+  }
+
+  const applyResult = gameResult.data.applyMove({
+    playerId: payload.playerId,
+    move: payload.move,
+  });
+  if (!applyResult.ok) {
+    switch (applyResult.error) {
+      case GAME_ENGINE_ERRORS.NOT_PLAYER_TURN:
+        sendError(
+          socket,
+          ERROR_CODES.WRONG_TURN_PLAYER,
+          applyResult.message,
+          payload.roomId,
+        );
+        return;
+      case GAME_ENGINE_ERRORS.INVALID_MOVE:
+      case GAME_ENGINE_ERRORS.INVALID_MOVE_INPUT:
+        sendError(
+          socket,
+          ERROR_CODES.ILLEGAL_MOVE,
+          applyResult.message,
+          payload.roomId,
+          payload.move,
+        );
+        return;
+      case GAME_ENGINE_ERRORS.PLAYER_NOT_IN_GAME:
+        sendError(
+          socket,
+          ERROR_CODES.SOCKET_NOT_ASSIGNED,
+          applyResult.message,
+          payload.roomId,
+        );
+        return;
+      case GAME_ENGINE_ERRORS.GAME_NOT_ACTIVE:
+        sendError(
+          socket,
+          ERROR_CODES.GAME_ALREADY_FINISHED,
+          "Game has already finished",
+          payload.roomId,
+        );
+        return;
+      default:
+        sendError(socket, applyResult.error, applyResult.message, payload.roomId);
+        return;
+    }
+  }
+
+  broadcastMoveApplied(
     payload.roomId,
-    payload.move,
+    applyResult.data.by,
+    applyResult.data.move,
+    applyResult.data.snapshot,
   );
+
+  if (applyResult.data.gameOver && applyResult.data.result) {
+    broadcastGameOver(
+      payload.roomId,
+      applyResult.data.snapshot.gameId,
+      applyResult.data.result,
+      applyResult.data.snapshot,
+    );
+  }
 }
 
 function handleSocketDisconnect(
@@ -304,6 +381,7 @@ function handleSocketDisconnect(
   }
 
   if (leaveResult.data.roomClosed) {
+    gameManager.closeGameForRoom(membership.roomId);
     const roomSockets = socketsByRoom.get(membership.roomId);
     if (roomSockets) {
       for (const roomSocket of roomSockets) {
@@ -483,18 +561,26 @@ function validateReadyPayload(
 
 function validateMovePayload(
   message: IncomingMessage,
-): { ok: true; payload: MovePayload } | { ok: false; message: string } {
+): { ok: true; payload: MoveIntentPayload } | { ok: false; message: string } {
   if (!isRecord(message.payload)) {
     return { ok: false, message: "move requires an object payload" };
   }
 
   const roomId = message.payload.roomId;
   const playerId = message.payload.playerId;
+  const move = message.payload.move;
   if (typeof roomId !== "string" || roomId.length === 0) {
     return { ok: false, message: "move payload.roomId must be a non-empty string" };
   }
   if (typeof playerId !== "string" || playerId.length === 0) {
     return { ok: false, message: "move payload.playerId must be a non-empty string" };
+  }
+  if (!isMoveInput(move)) {
+    return {
+      ok: false,
+      message:
+        "move payload.move must include non-empty 'from' and 'to' strings and optional promotion 'q'|'r'|'b'|'n'",
+    };
   }
   if (message.roomId && message.roomId !== roomId) {
     return { ok: false, message: "move roomId and payload.roomId must match" };
@@ -505,14 +591,18 @@ function validateMovePayload(
     payload: {
       roomId,
       playerId,
-      move: message.payload.move,
+      move,
     },
   };
 }
 
 function sendError(
   socket: WebSocket,
-  code: ErrorCode | RoomManagerErrorCode,
+  code:
+    | ErrorCode
+    | RoomManagerErrorCode
+    | GameManagerErrorCode
+    | GameEngineErrorCode,
   message: string,
   roomId?: SessionId,
   details?: unknown,
@@ -540,21 +630,122 @@ function broadcastRoomState(roomId: SessionId): void {
   }
 }
 
-function broadcastInitGame(roomId: SessionId): void {
+function createAndBroadcastInitGame(roomId: SessionId): void {
   const roomSockets = socketsByRoom.get(roomId);
   if (!roomSockets || roomSockets.size === 0) {
     return;
   }
 
   const room = roomManager.getRoom(roomId);
-  const payload = {
-    room,
-    startedAt: Date.now(),
-  };
+  if (!room) {
+    for (const roomSocket of roomSockets) {
+      sendError(
+        roomSocket,
+        ROOM_MANAGER_ERRORS.ROOM_NOT_FOUND,
+        `Room '${roomId}' does not exist`,
+        roomId,
+      );
+    }
+    return;
+  }
 
+  const createResult = gameManager.createGameForRoom(room);
+  if (!createResult.ok) {
+    const requireResult = gameManager.requireGame(roomId);
+    if (!requireResult.ok) {
+      for (const roomSocket of roomSockets) {
+        sendError(roomSocket, createResult.error, createResult.message, roomId);
+      }
+      return;
+    }
+  }
+
+  const requireResult = gameManager.requireGame(roomId);
+  if (!requireResult.ok) {
+    for (const roomSocket of roomSockets) {
+      sendError(roomSocket, requireResult.error, requireResult.message, roomId);
+    }
+    return;
+  }
+
+  const snapshot = requireResult.data.snapshot();
   for (const roomSocket of roomSockets) {
+    const membership = socketMembershipBySocket.get(roomSocket);
+    if (!membership) {
+      continue;
+    }
+
+    const youAre =
+      membership.playerId === snapshot.players.white
+        ? "white"
+        : membership.playerId === snapshot.players.black
+          ? "black"
+          : null;
+    if (!youAre) {
+      continue;
+    }
+
+    const payload: InitGamePayload = {
+      roomId,
+      gameId: snapshot.gameId,
+      youAre,
+      snapshot,
+    };
     send(roomSocket, {
       type: MESSAGE_TYPES.INIT_GAME,
+      roomId,
+      payload,
+    });
+  }
+}
+
+function broadcastMoveApplied(
+  roomId: SessionId,
+  by: PlayerId,
+  move: MoveIntentPayload["move"],
+  snapshot: InitGamePayload["snapshot"],
+): void {
+  const roomSockets = socketsByRoom.get(roomId);
+  if (!roomSockets || roomSockets.size === 0) {
+    return;
+  }
+
+  const payload: MoveAppliedPayload = {
+    roomId,
+    gameId: snapshot.gameId,
+    by,
+    move,
+    snapshot,
+  };
+  for (const roomSocket of roomSockets) {
+    send(roomSocket, {
+      type: MESSAGE_TYPES.MOVE_APPLIED,
+      roomId,
+      payload,
+    });
+  }
+}
+
+function broadcastGameOver(
+  roomId: SessionId,
+  gameId: string,
+  result: GameOverPayload["result"],
+  snapshot: GameOverPayload["snapshot"],
+): void {
+  const roomSockets = socketsByRoom.get(roomId);
+  if (!roomSockets || roomSockets.size === 0) {
+    return;
+  }
+
+  const payload: GameOverPayload = {
+    roomId,
+    gameId,
+    result,
+    snapshot,
+  };
+  for (const roomSocket of roomSockets) {
+    send(roomSocket, {
+      type: MESSAGE_TYPES.GAME_OVER,
       roomId,
       payload,
     });
@@ -578,6 +769,34 @@ function send(socket: WebSocket, message: BaseMessage<unknown>): void {
     return;
   }
   socket.send(JSON.stringify(message));
+}
+
+function isMoveInput(value: unknown): value is MoveIntentPayload["move"] {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  const from = value.from;
+  const to = value.to;
+  const promotion = value.promotion;
+
+  if (typeof from !== "string" || from.length === 0) {
+    return false;
+  }
+  if (typeof to !== "string" || to.length === 0) {
+    return false;
+  }
+  if (
+    promotion !== undefined &&
+    promotion !== "q" &&
+    promotion !== "r" &&
+    promotion !== "b" &&
+    promotion !== "n"
+  ) {
+    return false;
+  }
+
+  return true;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -7,6 +7,7 @@ Current model:
 - server-authoritative session state
 - typed websocket protocol boundary
 - waiting-room lifecycle with readiness-based activation
+- per-session game registry and deterministic terminal-state broadcasts
 
 ## Repository Structure
 - `client/`: React app (Vite), board UI, websocket client integration.
@@ -27,6 +28,13 @@ Current responsibilities:
 - route by message type in `src/index.ts`
 - maintain in-memory room lifecycle via `src/session/RoomManager.ts`
 - enforce session preconditions with typed error responses
+- maintain active game registry via `src/game/GameManager.ts`
+- apply authoritative chess moves via `src/game/GameEngine.ts`
+
+Game-core responsibilities:
+- own typed game domain contracts in `src/game/types.ts`
+- own typed protocol payload contracts in `src/protocol/types.ts`
+- provide deterministic move application and terminal-result detection
 
 ## Session Lifecycle (Implemented)
 1. `join_room`:
@@ -51,7 +59,10 @@ Current responsibilities:
 4. `move`:
 - validates socket ownership and payload boundary
 - rejects if room is not active
-- move application path intentionally deferred to next milestone
+- applies move through game engine for active rooms
+- broadcasts `move_applied` with authoritative snapshot
+- emits `game_over` with structured result on terminal state
+- rejects subsequent moves for finished games
 
 ## Synchronization Model
 - Server is source of truth for room/session state.
@@ -68,15 +79,16 @@ Current server-handled inbound types:
 - `join_room`
 - `leave_room`
 - `ready`
-- `move` (gated, application deferred)
+- `move`
 
 Current outbound types:
 - `room_state`
 - `init_game`
+- `move_applied`
+- `game_over`
 - `error`
 
 ## Known Gaps
-- No chess move execution yet (`move` is only precondition-gated).
 - No persistence across server restarts.
 - No reconnect/session recovery path.
 - No automated tests yet.

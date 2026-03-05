@@ -13,11 +13,16 @@ Port the older websocket chess prototype into a typed, server-authoritative sess
 - [x] ready-check transition `waiting -> active`
 - [x] `init_game` broadcast on session activation
 - [x] move rejection while room is not active
+- [x] game-core domain and payload contracts (`GameSnapshot`, move intent, game-over payload)
+- [x] move application path behind active-session gate
+- [x] authoritative `move_applied` snapshot broadcasts
+- [x] terminal `game_over` broadcast and finished-game move freeze
 
 ## 1. Complete Current Branch (Final Impl + Docs)
-- Implement move application path behind active-session gate.
-- Integrate chess engine state with `init_game` and post-move state broadcasts.
-- Finalize consolidated docs commit (design + bug-log + roadmap + architecture).
+- [x] Implement move application path behind active-session gate.
+- [x] Integrate chess engine state with `init_game` and post-move state broadcasts.
+- [x] Emit deterministic terminal-state `game_over` payload and freeze further moves.
+- [x] Finalize consolidated docs commit (design + bug-log + roadmap + architecture).
 
 ## 2. Post-MVP Hardening
 - Add reconnection strategy for transient disconnects.
@@ -26,9 +31,9 @@ Port the older websocket chess prototype into a typed, server-authoritative sess
 - Add protocol validation tests for malformed payload paths.
 
 ## 3. Gameplay Integration
-- Apply validated move intents using `chess.js`.
-- Broadcast authoritative game-state snapshots after each move.
-- Emit deterministic game-over outcomes from server state.
+- [x] Apply validated move intents using `chess.js`.
+- [x] Broadcast authoritative game-state snapshots after each move.
+- [x] Emit deterministic game-over outcomes from server state.
 
 ## 4. Product Layer
 - Add optional matchmaking queue.

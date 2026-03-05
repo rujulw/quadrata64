@@ -1,5 +1,77 @@
 # Bug Log
 
+## 2026-03-05 — Terminal moves lacked explicit `game_over` lifecycle event
+- Symptom: Clients could receive final move state but had no dedicated authoritative terminal event to lock UI flow.
+- Root cause: Router broadcasted `move_applied` snapshots only, without terminal-state signal.
+- Fix: Added terminal `game_over` broadcast with structured `{ gameId, result, snapshot }` payload.
+- Files: `server/src/index.ts`
+
+---
+
+## 2026-03-05 — Finished games accepted extra move intents at protocol boundary
+- Symptom: After game completion, move requests could still be attempted without a stable protocol-level terminal error code.
+- Root cause: Engine surfaced terminal inactivity, but router did not map it to explicit external contract semantics.
+- Fix: Added `game_already_finished` protocol error and mapped engine `game_not_active` to that error in move handling.
+- Files: `server/src/index.ts`, `server/src/protocol/messages.ts`
+
+---
+
+## 2026-03-05 — Ambiguous room-close cleanup intent in game registry lifecycle
+- Symptom: Game cleanup API name was generic, which made room-lifecycle teardown intent less explicit in router paths.
+- Root cause: Registry only exposed `closeGame`, while callsites were strictly room-bound lifecycle exits.
+- Fix: Added `closeGameForRoom(sessionId)` and switched router room-close/disconnect flows to use it.
+- Files: `server/src/game/GameManager.ts`, `server/src/index.ts`
+
+---
+
+## 2026-03-05 — `init_game` payload drift between clients and server authority
+- Symptom: Activation emitted an ad-hoc payload (`room`, `startedAt`) that did not match typed game contracts.
+- Root cause: Router init broadcast predated game snapshot wiring.
+- Fix: On activation edge, router now creates/requires game and sends typed per-player `init_game` with `gameId`, `youAre`, and authoritative `snapshot`.
+- Files: `server/src/index.ts`
+
+---
+
+## 2026-03-05 — Move route acknowledged active rooms but never applied moves
+- Symptom: `move` requests passed room-state gate but always returned `not_implemented`.
+- Root cause: Game registry and engine were not wired into websocket handlers.
+- Fix: Move handler now resolves session game, applies via `GameEngine`, and broadcasts typed `move_applied` snapshots.
+- Files: `server/src/index.ts`, `server/src/protocol/messages.ts`
+
+---
+
+## 2026-03-05 — Missing typed move failure semantics in router responses
+- Symptom: Wrong-turn and illegal moves were not represented as stable protocol error codes.
+- Root cause: Router had no mapping from engine failures to protocol-layer errors.
+- Fix: Added typed error codes (`game_not_found`, `wrong_turn_player`, `illegal_move`) and mapped engine/game-manager failures at the router boundary.
+- Files: `server/src/index.ts`, `server/src/protocol/messages.ts`
+
+---
+
+## 2026-03-05 — Duplicate game creation risk on repeated activation edges
+- Symptom: Without a registry guard, repeated activation handling could create multiple engine instances for the same room.
+- Root cause: No single owner mapping from `sessionId` to active game instance.
+- Fix: Added `GameManager` registry keyed by `sessionId` and explicit `GAME_ALREADY_EXISTS` rejection.
+- Files: `server/src/game/GameManager.ts`
+
+---
+
+## 2026-03-05 — Orphaned game state risk after room lifecycle closure
+- Symptom: Game engines could remain in memory after a room is closed, risking stale state reuse and leaks.
+- Root cause: No explicit lifecycle endpoint for per-room game teardown.
+- Fix: Added `closeGame(sessionId)` and room-scoped registry ownership to support deterministic cleanup.
+- Files: `server/src/game/GameManager.ts`
+
+---
+
+## 2026-03-01 — Ambiguous game payload contracts blocked safe engine port
+- Symptom: Existing `init_game`/`move` flow lacked explicit authoritative snapshot and result payload schemas.
+- Root cause: Early websocket milestones focused on routing and room lifecycle before game-core contract modeling.
+- Fix: Introduced `game/types` and protocol payload contracts for move intent, snapshot broadcasts, and terminal outcomes before engine wiring.
+- Files: `server/src/game/types.ts`, `server/src/protocol/types.ts`
+
+---
+
 ## 2026-03-01 — Envelope accepted malformed payload shape
 - Symptom: Valid JSON with missing/invalid payload fields could pass parse and reach business logic.
 - Root cause: Initial websocket skeleton only parsed JSON without payload-level guards.

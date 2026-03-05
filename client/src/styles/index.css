@@ -1,1 +1,107 @@
 @import "tailwindcss";
+@import url("https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap");
+
+@theme {
+  --font-sans: "Plus Jakarta Sans", "Segoe UI", sans-serif;
+  --font-display: "Sora", "Plus Jakarta Sans", sans-serif;
+
+  --color-app-bg: #050507;
+  --color-app-bg-elevated: #101019;
+  --color-app-edge: rgba(255, 255, 255, 0.12);
+  --color-app-text: #f6f4ff;
+  --color-app-text-muted: #b4adcc;
+  --color-app-purple-strong: #7a5cff;
+  --color-app-purple-soft: #e5dcff;
+  --color-board-light: #f8f4ff;
+  --color-board-dark: #6e50f3;
+
+  --shadow-panel: 0 20px 70px rgba(0, 0, 0, 0.55);
+  --shadow-board: 0 24px 60px rgba(7, 7, 10, 0.7);
+  --ease-snap: cubic-bezier(0.22, 0.9, 0.24, 1);
+  --dur-fast: 140ms;
+}
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html,
+  body,
+  #root {
+    min-height: 100%;
+  }
+
+  body {
+    margin: 0;
+    font-family: var(--font-sans);
+    color: var(--color-app-text);
+    background:
+      radial-gradient(1000px circle at 5% -10%, rgba(122, 92, 255, 0.25), transparent 50%),
+      radial-gradient(900px circle at 100% 0%, rgba(145, 94, 255, 0.2), transparent 40%),
+      var(--color-app-bg);
+  }
+}
+
+@layer components {
+  .ui-shell {
+    position: relative;
+    overflow: hidden;
+    border: 1px solid var(--color-app-edge);
+    border-radius: 1.25rem;
+    background: linear-gradient(160deg, rgba(28, 24, 45, 0.85), rgba(12, 12, 19, 0.92));
+    box-shadow: var(--shadow-panel);
+    backdrop-filter: blur(12px);
+  }
+
+  .ui-shell::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(120deg, rgba(146, 103, 255, 0.1), transparent 40%);
+  }
+
+  .title-display {
+    font-family: var(--font-display);
+    letter-spacing: -0.03em;
+  }
+
+  .board-frame {
+    border-radius: 1rem;
+    padding: 0.75rem;
+    background: black;
+    box-shadow: var(--shadow-board);
+  }
+
+  .board-grid {
+    display: grid;
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+    border-radius: 0.6rem;
+    overflow: hidden;
+  }
+
+  .board-cell {
+    aspect-ratio: 1 / 1;
+    transition: transform var(--dur-fast) var(--ease-snap);
+  }
+
+
+  .board-cell-light {
+    background: var(--color-board-light);
+  }
+
+  .board-cell-dark {
+    background: var(--color-board-dark);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .board-cell {
+    transition-duration: 0ms;
+  }
+}

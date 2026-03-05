@@ -1,13 +1,34 @@
 export default function App() {
+  const cells = Array.from({ length: 64 }, (_, index) => {
+    const row = Math.floor(index / 8);
+    const col = index % 8;
+    const isLight = (row + col) % 2 === 0;
+
+    return (
+      <div
+        key={index}
+        className={`board-cell ${isLight ? "board-cell-light" : "board-cell-dark"}`}
+      />
+    );
+  });
+
   return (
-    <main className="grid min-h-screen place-items-center bg-purple-950 px-6 text-slate-100">
-      <section className="w-full max-w-xl rounded-2xl border border-white/10 bg-slate-900/70 p-8 shadow-2xl">
-        <p className="text-sm tracking-[0.2em] text-slate-400">
-          quadrata64
-        </p>
-        <h1 className="mt-3 text-2xl font-semibold">
-          tailwind 4 migration is done
-        </h1>
+    <main className="mx-auto grid min-h-screen w-full max-w-6xl place-items-center px-5 py-10 sm:px-8">
+      <section className="ui-shell w-full p-5 sm:p-8">
+        <header className="mb-8 flex items-center justify-between">
+        </header>
+
+        <div className="grid gap-1 lg:grid-cols-[1.25fr_1fr] lg:items-center">
+          <div>
+            <h1 className="title-display text-3xl font-semibold leading-tight sm:text-4xl">
+              quadrata64 ui dev in progress
+            </h1>
+          </div>
+
+          <div className="board-frame">
+            <div className="board-grid">{cells}</div>
+          </div>
+        </div>
       </section>
     </main>
   );

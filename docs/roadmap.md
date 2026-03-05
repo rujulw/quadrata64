@@ -19,6 +19,8 @@ Port the older websocket chess prototype into a typed, server-authoritative sess
 - [x] terminal `game_over` broadcast and finished-game move freeze
 - [x] websocket handler/validator extraction (`ws/router.ts`, `ws/validators.ts`)
 - [x] final architecture docs pass for legacy-port decomposition and risk log
+- [x] Tailwind v4 CSS-first migration (`tailwindcss` + `@tailwindcss/postcss`)
+- [x] frontend visual-system baseline (AMOLED shell, purple/white board palette, typography + motion primitives)
 
 ## 1. Complete Current Branch (Final Impl + Docs)
 - [x] Implement move application path behind active-session gate.
@@ -28,6 +30,9 @@ Port the older websocket chess prototype into a typed, server-authoritative sess
 - [x] Finalize consolidated docs commit (design + bug-log + roadmap + architecture).
 
 ## Next Milestones (Immediate)
+- Implement app/page/feature/component structure on client.
+- Build waiting-room UI from server room snapshots.
+- Build interactive board surface and move intent UX.
 - Reconnect/session recovery policy and resume semantics.
 - Unit tests for `RoomManager`, `GameManager`, and `GameEngine`.
 - Integration tests for websocket protocol happy path and typed error paths.

@@ -21,6 +21,9 @@ Target responsibilities:
 - open websocket connection
 - send intent messages (`join_room`, `leave_room`, `ready`, `move`)
 - render from server snapshots (`room_state`, `init_game`, future game-state updates)
+- maintain CSS-first Tailwind v4 visual system (`src/styles/index.css`)
+- enforce brand visual direction: AMOLED shell + purple/white chessboard palette
+- apply motion + accessibility defaults (reduced-motion safe transitions)
 
 ### Backend (`server`)
 Current responsibilities:
@@ -99,6 +102,7 @@ Current outbound types:
 - No persistence across server restarts.
 - No reconnect/session recovery path.
 - No automated tests yet.
+- Frontend still lacks feature modules (`pages`, `features`, `components/ui`) beyond style scaffold.
 
 ## Environment Variables
 ### Server

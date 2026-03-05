@@ -12,6 +12,7 @@ Current model:
 ## Repository Structure
 - `client/`: React app (Vite), board UI, websocket client integration.
 - `server/`: websocket server, protocol validation, room/session lifecycle.
+- `server/src/ws/`: websocket router + payload/envelope validators.
 - `docs/`: design decisions, roadmap, architecture, and bug history.
 
 ## Runtime Architecture
@@ -23,9 +24,9 @@ Target responsibilities:
 
 ### Backend (`server`)
 Current responsibilities:
-- parse and validate websocket message envelopes
-- validate payload boundaries per message type
-- route by message type in `src/index.ts`
+- bootstrap server process in `src/index.ts`
+- parse envelope + payload boundaries in `src/ws/validators.ts`
+- route websocket message handlers in `src/ws/router.ts`
 - maintain in-memory room lifecycle via `src/session/RoomManager.ts`
 - enforce session preconditions with typed error responses
 - maintain active game registry via `src/game/GameManager.ts`
@@ -68,6 +69,12 @@ Game-core responsibilities:
 - Server is source of truth for room/session state.
 - Clients never infer authoritative room state from local actions.
 - Invalid actions receive structured `error` messages with typed error codes.
+
+## Legacy Decomposition
+Old prototype classes were split to match current boundaries:
+- Old `Game.ts` responsibilities now live in `GameEngine` (chess state, move validity, terminal results).
+- Old `GameManager.ts` matchmaking/pending-user flow is replaced by `RoomManager` readiness lifecycle.
+- Websocket transport concerns are isolated in `ws/router.ts` and `ws/validators.ts`.
 
 ## Message Envelope
 All messages use:

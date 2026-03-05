@@ -1,5 +1,21 @@
 # Bug Log
 
+## 2026-03-05 — Monolithic websocket entrypoint increased regression surface
+- Symptom: `index.ts` mixed parse, validation, room lifecycle routing, game lifecycle, and socket fanout in one file.
+- Root cause: Initial implementation optimized for delivery speed rather than long-term handler isolation.
+- Fix: Extracted transport orchestration to `ws/router.ts` and payload/envelope guards to `ws/validators.ts`, leaving `index.ts` as bootstrap wiring only.
+- Files: `server/src/index.ts`, `server/src/ws/router.ts`, `server/src/ws/validators.ts`
+
+---
+
+## 2026-03-05 — Legacy pending-user matchmaking race risk during port
+- Symptom: Old prototype approach could pair sockets opportunistically (`pendingUser`), bypassing room readiness guarantees.
+- Root cause: Matchmaking ownership was embedded inside transport manager instead of room/session lifecycle.
+- Fix: Kept room activation in `RoomManager`, game ownership in session-scoped `GameManager`, and avoided reintroducing pending-user state in router refactor.
+- Files: `server/src/session/RoomManager.ts`, `server/src/game/GameManager.ts`, `server/src/ws/router.ts`
+
+---
+
 ## 2026-03-05 — Terminal moves lacked explicit `game_over` lifecycle event
 - Symptom: Clients could receive final move state but had no dedicated authoritative terminal event to lock UI flow.
 - Root cause: Router broadcasted `move_applied` snapshots only, without terminal-state signal.
@@ -59,7 +75,7 @@
 ## 2026-03-05 — Orphaned game state risk after room lifecycle closure
 - Symptom: Game engines could remain in memory after a room is closed, risking stale state reuse and leaks.
 - Root cause: No explicit lifecycle endpoint for per-room game teardown.
-- Fix: Added `closeGame(sessionId)` and room-scoped registry ownership to support deterministic cleanup.
+- Fix: Added `closeGameForRoom(sessionId)` and room-scoped registry ownership to support deterministic cleanup.
 - Files: `server/src/game/GameManager.ts`
 
 ---
@@ -76,7 +92,7 @@
 - Symptom: Valid JSON with missing/invalid payload fields could pass parse and reach business logic.
 - Root cause: Initial websocket skeleton only parsed JSON without payload-level guards.
 - Fix: Added per-message validators for `join_room`, `leave_room`, `ready`, and `move` payload boundaries.
-- Files: `server/src/index.ts`
+- Files: `server/src/ws/validators.ts`
 
 ---
 

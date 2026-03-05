@@ -7,6 +7,7 @@ import {
 } from "./protocol/messages";
 import type {
   BaseMessage,
+  GameOverPayload,
   InitGamePayload,
   JoinRoomPayload,
   LeaveRoomPayload,
@@ -207,7 +208,7 @@ function handleLeaveRoom(socket: WebSocket, message: IncomingMessage): void {
   unbindSocketMembership(socket);
 
   if (leaveResult.data.roomClosed) {
-    gameManager.closeGame(payload.roomId);
+    gameManager.closeGameForRoom(payload.roomId);
     const roomSockets = socketsByRoom.get(payload.roomId);
     if (roomSockets) {
       for (const roomSocket of roomSockets) {
@@ -333,6 +334,14 @@ function handleMove(socket: WebSocket, message: IncomingMessage): void {
           payload.roomId,
         );
         return;
+      case GAME_ENGINE_ERRORS.GAME_NOT_ACTIVE:
+        sendError(
+          socket,
+          ERROR_CODES.GAME_ALREADY_FINISHED,
+          "Game has already finished",
+          payload.roomId,
+        );
+        return;
       default:
         sendError(socket, applyResult.error, applyResult.message, payload.roomId);
         return;
@@ -345,6 +354,15 @@ function handleMove(socket: WebSocket, message: IncomingMessage): void {
     applyResult.data.move,
     applyResult.data.snapshot,
   );
+
+  if (applyResult.data.gameOver && applyResult.data.result) {
+    broadcastGameOver(
+      payload.roomId,
+      applyResult.data.snapshot.gameId,
+      applyResult.data.result,
+      applyResult.data.snapshot,
+    );
+  }
 }
 
 function handleSocketDisconnect(
@@ -363,7 +381,7 @@ function handleSocketDisconnect(
   }
 
   if (leaveResult.data.roomClosed) {
-    gameManager.closeGame(membership.roomId);
+    gameManager.closeGameForRoom(membership.roomId);
     const roomSockets = socketsByRoom.get(membership.roomId);
     if (roomSockets) {
       for (const roomSocket of roomSockets) {
@@ -702,6 +720,32 @@ function broadcastMoveApplied(
   for (const roomSocket of roomSockets) {
     send(roomSocket, {
       type: MESSAGE_TYPES.MOVE_APPLIED,
+      roomId,
+      payload,
+    });
+  }
+}
+
+function broadcastGameOver(
+  roomId: SessionId,
+  gameId: string,
+  result: GameOverPayload["result"],
+  snapshot: GameOverPayload["snapshot"],
+): void {
+  const roomSockets = socketsByRoom.get(roomId);
+  if (!roomSockets || roomSockets.size === 0) {
+    return;
+  }
+
+  const payload: GameOverPayload = {
+    roomId,
+    gameId,
+    result,
+    snapshot,
+  };
+  for (const roomSocket of roomSockets) {
+    send(roomSocket, {
+      type: MESSAGE_TYPES.GAME_OVER,
       roomId,
       payload,
     });

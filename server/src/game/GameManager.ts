@@ -88,9 +88,13 @@ export class GameManager {
     return this.ok(game);
   }
 
-  closeGame(sessionId: SessionId): GameManagerResult<CloseGameOutput> {
+  closeGameForRoom(sessionId: SessionId): GameManagerResult<CloseGameOutput> {
     const existed = this.gamesBySession.delete(sessionId);
     return this.ok({ removed: existed });
+  }
+
+  closeGame(sessionId: SessionId): GameManagerResult<CloseGameOutput> {
+    return this.closeGameForRoom(sessionId);
   }
 
   private generateGameId(sessionId: SessionId): string {

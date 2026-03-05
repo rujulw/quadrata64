@@ -82,4 +82,21 @@ Why:
 Impact:
 - On activation edge, router creates/requires game and emits per-player `init_game` with `{ gameId, youAre, snapshot }`.
 - On `move`, router validates payload boundary, applies move via engine, and broadcasts `move_applied` with updated snapshot.
-- Room-close paths now tear down registry game state through `GameManager.closeGame`.
+- Room-close paths now tear down registry game state through `GameManager.closeGameForRoom`.
+
+---
+
+## 6. Terminal-State Broadcast and Move Freeze
+
+Decision:
+Treat terminal game state as an explicit protocol event (`game_over`) and reject all subsequent move intents for that game.
+
+Why:
+- Gives clients a deterministic lifecycle edge instead of inferring finish from move deltas.
+- Prevents post-checkmate/stalemate drift from late or duplicated move messages.
+- Keeps game-core authority in one place: engine computes result, router only broadcasts it.
+
+Impact:
+- Router emits `game_over` immediately after the terminal `move_applied` snapshot.
+- Router maps engine `game_not_active` to protocol error `game_already_finished` for post-terminal move attempts.
+- Game registry remains session-scoped, and room-close paths continue to tear down game instances (`closeGameForRoom`).

@@ -5,11 +5,20 @@ import { LoaderOne } from "../../components/ui/loader";
 
 type WaitingRoomPanelProps = {
   onToggleReady: () => void;
+  isMatching: boolean;
+  isReady: boolean;
+  canReady: boolean;
+  roomPhase: "waiting" | "active";
 };
 
-export function WaitingRoomPanel({ onToggleReady }: WaitingRoomPanelProps) {
+export function WaitingRoomPanel({
+  onToggleReady,
+  isMatching,
+  isReady,
+  canReady,
+  roomPhase,
+}: WaitingRoomPanelProps) {
   const [timeControl, setTimeControl] = useState("rapid");
-  const [isMatching, setIsMatching] = useState(false);
   const [isTimeMenuOpen, setIsTimeMenuOpen] = useState(false);
 
   const selectedLabel = useMemo(() => {
@@ -30,9 +39,9 @@ export function WaitingRoomPanel({ onToggleReady }: WaitingRoomPanelProps) {
           <div className="relative mt-2">
             <button
               type="button"
-              className="flex w-full items-center justify-between rounded-xl border border-white/10 bg-[#2b2f37] px-3 py-2.5 text-sm text-white transition-colors hover:border-white/20"
+              className="flex w-full items-center justify-between rounded-xl border border-white/10 bg-[#2b2f37] px-3 py-2.5 text-sm text-white transition-colors hover:border-white/20 disabled:cursor-not-allowed disabled:opacity-55"
               onClick={() => setIsTimeMenuOpen((prev) => !prev)}
-              disabled={isMatching}
+              disabled={isMatching || !canReady}
             >
               <span>{selectedLabel}</span>
               <span className="text-white/55">{isTimeMenuOpen ? "▲" : "▼"}</span>
@@ -65,25 +74,24 @@ export function WaitingRoomPanel({ onToggleReady }: WaitingRoomPanelProps) {
           </div>
         </div>
 
-        <div className="min-h-7">
+        <div className="flex h-10 items-center">
           {isMatching ? (
-            <div className="flex items-center gap-3 text-sm text-white/75">
+            <div className="flex items-center gap-3 pb-1 text-sm text-white/75">
               <LoaderOne />
               <span>matching...</span>
             </div>
           ) : null}
         </div>
 
+        <p className="text-center text-xs text-white/45">phase: {roomPhase}</p>
+
         <button
           type="button"
-          className="mx-auto w-fit min-w-40 rounded-xl bg-app-purple-strong px-7 py-2.5 text-lg font-semibold text-white transition-opacity hover:opacity-90"
-          onClick={() => {
-            setIsMatching(true);
-            onToggleReady();
-          }}
-          disabled={isMatching}
+          className="mx-auto w-fit min-w-40 rounded-xl bg-app-purple-strong px-7 py-2.5 text-lg font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-55"
+          onClick={onToggleReady}
+          disabled={!canReady}
         >
-          {isMatching ? "queued" : "ready up"}
+          {isMatching ? "queued" : isReady ? "unready" : "ready up"}
         </button>
       </div>
     </GlareCard>

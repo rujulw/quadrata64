@@ -152,3 +152,21 @@ Impact:
 - Reusable UI primitives live in `client/src/components/ui/*` (`button`, `hero-highlight`, `card-spotlight`, `dotted-map`).
 - Landing page composes those primitives in `client/src/pages/LandingPage.tsx`.
 - Visual tokens in `client/src/styles/index.css` drive lavender accenting and consistent contrast.
+
+---
+
+## 10. Client Feature Boundary Split (Room / Board / WS)
+
+Decision:
+Split client gameplay concerns into explicit feature modules for waiting-room state, board state, and websocket sync.
+
+Why:
+- Prevents route/page files from coupling transport details directly to board rendering.
+- Creates clear ownership boundaries before implementing room sync and board interaction behavior.
+- Enables commit-by-commit implementation without repeated folder churn.
+
+Impact:
+- Added `client/src/features/ws/*` for sync contracts and intent-dispatch adapter hooks.
+- Added `client/src/features/room/*` for room snapshot contracts and waiting-room UI surface.
+- Added `client/src/features/board/*` for game snapshot contracts and board surface component.
+- Added `client/src/pages/PlayPage.tsx` as the composition boundary for these modules.

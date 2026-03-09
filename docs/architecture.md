@@ -27,6 +27,11 @@ Target responsibilities:
 - apply motion + accessibility defaults (reduced-motion safe transitions)
 - provide reusable UI primitives in `src/components/ui/*` (button, highlight, spotlight, map effects)
 - keep landing composition in `src/pages/LandingPage.tsx` with hero messaging and board-first framing
+- enforce feature boundaries under `src/features/*`:
+- `src/features/ws/*` owns websocket sync contracts, state adapter, and transport-facing intent API
+- `src/features/room/*` owns waiting-room state contracts and seat/readiness presentation
+- `src/features/board/*` owns board/game snapshot contracts and board surface rendering
+- compose feature modules in route pages (`src/pages/PlayPage.tsx`) without cross-feature coupling
 
 ### Backend (`server`)
 Current responsibilities:

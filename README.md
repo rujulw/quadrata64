@@ -5,7 +5,7 @@ Server-authoritative state management with synchronized move validation using `c
 
 See:
 - `docs/architecture.md` for system structure and synchronization model.
-- `roadmap.md` for planned refactors and feature expansion.
+- `docs/roadmap.md` for planned feature expansion.
 
 ## Tech Stack
 
@@ -20,13 +20,13 @@ See:
 - TypeScript
 - TailwindCSS
 - React Router
+- Motion (`motion/react`)
 - WebSocket client synchronization
 
 ## Project Structure
 - `client/` React UI and board interaction logic
 - `server/` WebSocket server and game state management
 - `docs/` architecture notes and system planning
-- `roadmap.md` execution roadmap
 
 ## Quick Start
 
@@ -61,8 +61,8 @@ WebSocket server default: `ws://localhost:3000`
 - No persistent game storage.
 - No clock / time control implementation.
 - No comprehensive test suite yet.
+- Waiting-room and analyzer client flows are in active implementation.
 
 ## Development Workflow
 - Branch naming: `feat/<branch-name>`
-- Commit convention: `[impl] brief message` and `[refactor] brief message`
 - Architecture notes maintained under `docs/`

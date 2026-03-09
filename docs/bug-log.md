@@ -120,8 +120,8 @@
 
 ---
 
-## 2026-03-01 — Doc drift during incremental backend commits
+## 2026-03-01 — Doc drift during incremental backend milestones
 - Symptom: Architecture and plan docs lagged behind implementation checkpoints.
 - Root cause: Early implementation milestones landed before doc updates were consolidated.
-- Fix: Consolidated roadmap, design, architecture, and bug-log updates into branch-end doc pass.
+- Fix: Consolidated roadmap, design, architecture, and bug-log updates into a single documentation sync pass.
 - Files: `docs/architecture.md`, `docs/roadmap.md`, `docs/design.md`, `docs/bug-log.md`

@@ -48,7 +48,7 @@ Why:
 Impact:
 - Added `server/src/game/types.ts` for `GameSnapshot`, move input, status, and result contracts.
 - Added protocol payload types for `init_game`, move intent, move-applied, room-state, and `game_over`.
-- Next commits can focus on behavior implementation instead of reshaping message schemas.
+- Next implementation phases can focus on behavior rather than reshaping message schemas.
 
 ---
 
@@ -135,3 +135,20 @@ Impact:
 - Session game ownership is isolated in `GameManager` keyed by `sessionId`.
 - Room readiness and seat ownership remain isolated in `RoomManager`.
 - Router acts as an adapter layer only and no longer carries hidden matchmaking state.
+
+---
+
+## 9. Frontend Landing Direction (Minimal + Atmospheric)
+
+Decision:
+Use a full-bleed landing layout with a left-aligned hero message and a right-side board preview, backed by subtle spotlight and dotted-map effects.
+
+Why:
+- Keeps first impression focused on product identity without heavy UI chrome.
+- Supports a premium look while preserving fast readability and low visual noise.
+- Creates a clear narrative: live chess now, analyzer depth next, quantum mode as an experimental lane.
+
+Impact:
+- Reusable UI primitives live in `client/src/components/ui/*` (`button`, `hero-highlight`, `card-spotlight`, `dotted-map`).
+- Landing page composes those primitives in `client/src/pages/LandingPage.tsx`.
+- Visual tokens in `client/src/styles/index.css` drive lavender accenting and consistent contrast.

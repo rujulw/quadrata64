@@ -8,6 +8,7 @@ Current model:
 - typed websocket protocol boundary
 - waiting-room lifecycle with readiness-based activation
 - per-session game registry and deterministic terminal-state broadcasts
+- full-bleed landing UI with motion, spotlight lighting, and dotted-map atmosphere
 
 ## Repository Structure
 - `client/`: React app (Vite), board UI, websocket client integration.
@@ -22,8 +23,10 @@ Target responsibilities:
 - send intent messages (`join_room`, `leave_room`, `ready`, `move`)
 - render from server snapshots (`room_state`, `init_game`, future game-state updates)
 - maintain CSS-first Tailwind v4 visual system (`src/styles/index.css`)
-- enforce brand visual direction: AMOLED shell + purple/white chessboard palette
+- enforce brand visual direction: dark minimal shell with lavender accents and restrained motion
 - apply motion + accessibility defaults (reduced-motion safe transitions)
+- provide reusable UI primitives in `src/components/ui/*` (button, highlight, spotlight, map effects)
+- keep landing composition in `src/pages/LandingPage.tsx` with hero messaging and board-first framing
 
 ### Backend (`server`)
 Current responsibilities:
@@ -102,7 +105,7 @@ Current outbound types:
 - No persistence across server restarts.
 - No reconnect/session recovery path.
 - No automated tests yet.
-- Frontend still lacks feature modules (`pages`, `features`, `components/ui`) beyond style scaffold.
+- Waiting room controls, analyzer interactions, and in-game board mechanics are not fully wired on client yet.
 
 ## Environment Variables
 ### Server

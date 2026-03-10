@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 
-import type { GameSnapshot } from "../board/types";
+import type { GameSnapshot, MoveIntent } from "../board/types";
 import type { RoomSnapshot } from "../room/types";
 import type {
   SyncActions,
@@ -39,6 +39,8 @@ const initialState: SyncState = {
   errorMessage: null,
 };
 
+const START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
@@ -72,10 +74,13 @@ function mapServerGameSnapshot(payload: unknown): GameSnapshot | null {
   const snapshot = isRecord(payload.snapshot) ? payload.snapshot : null;
   if (!snapshot) return null;
 
-  const fen = typeof snapshot.fen === "string" ? snapshot.fen : "startpos";
-  const turn = snapshot.turn === "b" ? "b" : "w";
+  const fen = typeof snapshot.fen === "string" ? snapshot.fen : START_FEN;
+  const turn = snapshot.turn === "black" ? "black" : "white";
   const status = snapshot.status === "finished" ? "finished" : "active";
-  const moveCount = Array.isArray(snapshot.moves) ? snapshot.moves.length : 0;
+  const moveCount =
+    typeof snapshot.moveCount === "number" && Number.isFinite(snapshot.moveCount)
+      ? snapshot.moveCount
+      : 0;
 
   return { fen, turn, status, moveCount };
 }
@@ -255,6 +260,21 @@ export function useWsSync(config: SyncConfig): SyncState & SyncActions {
     [sendIntent],
   );
 
+  const dispatchMoveIntent = useCallback(
+    (roomId: string, playerId: string, move: MoveIntent) => {
+      sendIntent({
+        type: "move",
+        roomId,
+        payload: {
+          roomId,
+          playerId,
+          move,
+        },
+      });
+    },
+    [sendIntent],
+  );
+
   return useMemo(
     () => ({
       ...state,
@@ -262,7 +282,8 @@ export function useWsSync(config: SyncConfig): SyncState & SyncActions {
       disconnect,
       sendIntent,
       toggleReadyIntent,
+      dispatchMoveIntent,
     }),
-    [state, connect, disconnect, sendIntent, toggleReadyIntent],
+    [state, connect, disconnect, sendIntent, toggleReadyIntent, dispatchMoveIntent],
   );
 }

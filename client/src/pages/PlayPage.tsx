@@ -14,8 +14,8 @@ const DEFAULT_ROOM: RoomSnapshot = {
 };
 
 const DEFAULT_GAME: GameSnapshot = {
-  fen: "startpos",
-  turn: "w",
+  fen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+  turn: "white",
   moveCount: 0,
   status: "active",
 };
@@ -43,6 +43,7 @@ export default function PlayPage() {
     connect,
     disconnect,
     toggleReadyIntent,
+    dispatchMoveIntent,
   } = useWsSync({ roomId, playerId });
 
   useEffect(() => {
@@ -62,6 +63,13 @@ export default function PlayPage() {
       : room.black?.peerId === playerId
         ? room.black
         : null;
+  const currentPlayerColor =
+    room.white?.peerId === playerId
+      ? "white"
+      : room.black?.peerId === playerId
+        ? "black"
+        : null;
+  const orientation = currentPlayerColor === "black" ? "black" : "white";
 
   const isReady = Boolean(currentSeat?.isReady);
   const canReady = Boolean(currentSeat);
@@ -88,7 +96,12 @@ export default function PlayPage() {
           </div>
 
           <div className="flex w-full justify-start">
-            <BoardSurface snapshot={game} orientation="white" />
+            <BoardSurface
+              snapshot={game}
+              orientation={orientation}
+              playerColor={currentPlayerColor}
+              onMoveIntent={(move) => dispatchMoveIntent(room.roomId, playerId, move)}
+            />
           </div>
         </div>
       </div>

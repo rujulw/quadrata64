@@ -1,5 +1,21 @@
 # Bug Log
 
+## 2026-03-09 — React StrictMode cleanup closed websocket before handshake completion
+- Symptom: Browser surfaced `WebSocket is closed before the connection is established` during `/play` mount/unmount cycles in dev.
+- Root cause: Client cleanup path called `close()` on a `CONNECTING` socket during StrictMode double-invoke lifecycle.
+- Fix: Updated websocket adapter to guard `CONNECTING`/`OPEN` socket reuse, defer close for pre-open sockets, and ignore stale socket events.
+- Files: `client/src/features/ws/useWsSync.ts`
+
+---
+
+## 2026-03-09 — Waiting-room regressions lacked interaction-level client test coverage
+- Symptom: UI-ready states and action dispatch behavior could regress silently during rapid panel/layout iteration.
+- Root cause: No client test harness was configured for component interaction testing.
+- Fix: Added Vitest + Testing Library setup and waiting-room panel tests for rendering states and ready-action dispatch.
+- Files: `client/package.json`, `client/vite.config.ts`, `client/src/test/setup.ts`, `client/src/features/room/WaitingRoomPanel.test.tsx`
+
+---
+
 ## 2026-03-05 — Monolithic websocket entrypoint increased regression surface
 - Symptom: `index.ts` mixed parse, validation, room lifecycle routing, game lifecycle, and socket fanout in one file.
 - Root cause: Initial implementation optimized for delivery speed rather than long-term handler isolation.
@@ -120,8 +136,8 @@
 
 ---
 
-## 2026-03-01 — Doc drift during incremental backend commits
+## 2026-03-01 — Doc drift during incremental backend milestones
 - Symptom: Architecture and plan docs lagged behind implementation checkpoints.
 - Root cause: Early implementation milestones landed before doc updates were consolidated.
-- Fix: Consolidated roadmap, design, architecture, and bug-log updates into branch-end doc pass.
+- Fix: Consolidated roadmap, design, architecture, and bug-log updates into a single documentation sync pass.
 - Files: `docs/architecture.md`, `docs/roadmap.md`, `docs/design.md`, `docs/bug-log.md`

@@ -8,6 +8,8 @@ Current model:
 - typed websocket protocol boundary
 - waiting-room lifecycle with readiness-based activation
 - per-session game registry and deterministic terminal-state broadcasts
+- full-bleed landing UI with motion, spotlight lighting, and dotted-map atmosphere
+- live client waiting-room sync on `/play` (join + room-state hydration + ready toggle dispatch)
 
 ## Repository Structure
 - `client/`: React app (Vite), board UI, websocket client integration.
@@ -21,6 +23,18 @@ Target responsibilities:
 - open websocket connection
 - send intent messages (`join_room`, `leave_room`, `ready`, `move`)
 - render from server snapshots (`room_state`, `init_game`, future game-state updates)
+- maintain CSS-first Tailwind v4 visual system (`src/styles/index.css`)
+- enforce brand visual direction: dark minimal shell with lavender accents and restrained motion
+- apply motion + accessibility defaults (reduced-motion safe transitions)
+- provide reusable UI primitives in `src/components/ui/*` (button, highlight, spotlight, map effects)
+- keep landing composition in `src/pages/LandingPage.tsx` with hero messaging and board-first framing
+- enforce feature boundaries under `src/features/*`:
+- `src/features/ws/*` owns websocket sync contracts, state adapter, and transport-facing intent API
+- `src/features/room/*` owns waiting-room state contracts and seat/readiness presentation
+- `src/features/board/*` owns board/game snapshot contracts and board surface rendering
+- compose feature modules in route pages (`src/pages/PlayPage.tsx`) without cross-feature coupling
+- persist tab-scoped transport identity (`sessionStorage`) for multi-tab room testing
+- run interaction coverage via Vitest + Testing Library (`src/features/room/WaitingRoomPanel.test.tsx`)
 
 ### Backend (`server`)
 Current responsibilities:
@@ -98,7 +112,9 @@ Current outbound types:
 ## Known Gaps
 - No persistence across server restarts.
 - No reconnect/session recovery path.
-- No automated tests yet.
+- No server-side automated tests yet.
+- Client tests currently cover waiting-room interaction only (no board/gameplay integration tests yet).
+- Analyzer interactions and in-game board mechanics are not fully wired on client yet.
 
 ## Environment Variables
 ### Server
@@ -112,3 +128,5 @@ Current outbound types:
 - `make dev`
 - `make build`
 - `make typecheck`
+- `cd client && npm run test`
+- `cd client && npm run test:run`

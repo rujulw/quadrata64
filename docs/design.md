@@ -48,7 +48,7 @@ Why:
 Impact:
 - Added `server/src/game/types.ts` for `GameSnapshot`, move input, status, and result contracts.
 - Added protocol payload types for `init_game`, move intent, move-applied, room-state, and `game_over`.
-- Next commits can focus on behavior implementation instead of reshaping message schemas.
+- Next implementation phases can focus on behavior rather than reshaping message schemas.
 
 ---
 
@@ -135,3 +135,74 @@ Impact:
 - Session game ownership is isolated in `GameManager` keyed by `sessionId`.
 - Room readiness and seat ownership remain isolated in `RoomManager`.
 - Router acts as an adapter layer only and no longer carries hidden matchmaking state.
+
+---
+
+## 9. Frontend Landing Direction (Minimal + Atmospheric)
+
+Decision:
+Use a full-bleed landing layout with a left-aligned hero message and a right-side board preview, backed by subtle spotlight and dotted-map effects.
+
+Why:
+- Keeps first impression focused on product identity without heavy UI chrome.
+- Supports a premium look while preserving fast readability and low visual noise.
+- Creates a clear narrative: live chess now, analyzer depth next, quantum mode as an experimental lane.
+
+Impact:
+- Reusable UI primitives live in `client/src/components/ui/*` (`button`, `hero-highlight`, `card-spotlight`, `dotted-map`).
+- Landing page composes those primitives in `client/src/pages/LandingPage.tsx`.
+- Visual tokens in `client/src/styles/index.css` drive lavender accenting and consistent contrast.
+
+---
+
+## 10. Client Feature Boundary Split (Room / Board / WS)
+
+Decision:
+Split client gameplay concerns into explicit feature modules for waiting-room state, board state, and websocket sync.
+
+Why:
+- Prevents route/page files from coupling transport details directly to board rendering.
+- Creates clear ownership boundaries before implementing room sync and board interaction behavior.
+- Enables commit-by-commit implementation without repeated folder churn.
+
+Impact:
+- Added `client/src/features/ws/*` for sync contracts and intent-dispatch adapter hooks.
+- Added `client/src/features/room/*` for room snapshot contracts and waiting-room UI surface.
+- Added `client/src/features/board/*` for game snapshot contracts and board surface component.
+- Added `client/src/pages/PlayPage.tsx` as the composition boundary for these modules.
+
+---
+
+## 11. Client Waiting-Room Sync over Server Authority
+
+Decision:
+Drive `/play` waiting-room readiness UI from authoritative websocket `room_state` events, not local-only toggles.
+
+Why:
+- Keeps room seat/readiness state consistent across tabs and clients.
+- Avoids UI drift where local "ready" appears set but server does not accept state.
+- Preserves server-authoritative lifecycle (`waiting -> active`) as the single source of truth.
+
+Impact:
+- `client/src/features/ws/useWsSync.ts` now opens websocket, sends `join_room`, and hydrates room state from inbound `room_state`.
+- Ready button dispatches real `ready` payloads (`roomId`, `playerId`, `ready`) instead of local-only state updates.
+- Tab-scoped player identity is persisted via `sessionStorage` for multi-tab local testing.
+
+---
+
+## 12. Client Interaction Testing Baseline
+
+Decision:
+Introduce a lightweight client test harness focused on waiting-room rendering and action dispatch.
+
+Why:
+- Protects the most regression-prone surface introduced in commit 19: UI state mapping + ready intent dispatch.
+- Enables fast confidence checks during rapid UI iteration.
+- Establishes reusable tooling for upcoming board interaction tests.
+
+Impact:
+- Added Vitest + Testing Library setup (`client/vite.config.ts`, `client/src/test/setup.ts`, `client/package.json` scripts).
+- Added `client/src/features/room/WaitingRoomPanel.test.tsx` covering:
+- state rendering (`ready_up`, `queued`, `unready`, waiting/active phase)
+- action dispatch (`onToggleReady`)
+- disabled controls for non-seated users

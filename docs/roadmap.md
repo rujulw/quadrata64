@@ -1,7 +1,7 @@
 # Roadmap
 
 ## Goal
-Port the older websocket chess prototype into a typed, server-authoritative session architecture with clean commit discipline and staged PRs.
+Port the older websocket chess prototype into a typed, server-authoritative session architecture with staged feature rollout.
 
 ## Immediate Baseline
 - [x] websocket server bootstrap and JSON boundary
@@ -18,19 +18,29 @@ Port the older websocket chess prototype into a typed, server-authoritative sess
 - [x] authoritative `move_applied` snapshot broadcasts
 - [x] terminal `game_over` broadcast and finished-game move freeze
 - [x] websocket handler/validator extraction (`ws/router.ts`, `ws/validators.ts`)
-- [x] final architecture docs pass for legacy-port decomposition and risk log
+- [x] consolidated architecture docs sync for legacy-port decomposition and risk log
+- [x] Tailwind v4 CSS-first migration (`tailwindcss` + `@tailwindcss/postcss`)
+- [x] frontend visual-system baseline (AMOLED shell, purple/white board palette, typography + motion primitives)
+- [x] landing experience refactor with reusable UI primitives (`button`, `hero-highlight`, `card-spotlight`, `dotted-map`)
+- [x] client feature-module boundary split (`features/ws`, `features/room`, `features/board`)
+- [x] `/play` waiting-room websocket sync (`join_room`, `room_state` hydration, ready dispatch)
+- [x] client-side ready-state synchronization in UI (waiting/active mapped from server room state)
+- [x] initial client interaction tests for waiting-room rendering + action dispatch (Vitest + Testing Library)
 
 ## 1. Complete Current Branch (Final Impl + Docs)
 - [x] Implement move application path behind active-session gate.
 - [x] Integrate chess engine state with `init_game` and post-move state broadcasts.
 - [x] Emit deterministic terminal-state `game_over` payload and freeze further moves.
 - [x] Extract websocket handlers/validators to keep index thin without behavior drift.
-- [x] Finalize consolidated docs commit (design + bug-log + roadmap + architecture).
+- [x] Finalize consolidated docs sync (design + bug-log + roadmap + architecture).
 
 ## Next Milestones (Immediate)
+- Expand board module beyond static 8x8 shell to render piece placement from authoritative snapshots.
+- Build interactive board move intent UX and route move dispatch through websocket adapter.
 - Reconnect/session recovery policy and resume semantics.
 - Unit tests for `RoomManager`, `GameManager`, and `GameEngine`.
 - Integration tests for websocket protocol happy path and typed error paths.
+- Add client integration tests covering multi-tab readiness-to-activation transition.
 
 ## 2. Post-MVP Hardening
 - Add reconnection strategy for transient disconnects.

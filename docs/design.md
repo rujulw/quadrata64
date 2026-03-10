@@ -170,3 +170,39 @@ Impact:
 - Added `client/src/features/room/*` for room snapshot contracts and waiting-room UI surface.
 - Added `client/src/features/board/*` for game snapshot contracts and board surface component.
 - Added `client/src/pages/PlayPage.tsx` as the composition boundary for these modules.
+
+---
+
+## 11. Client Waiting-Room Sync over Server Authority
+
+Decision:
+Drive `/play` waiting-room readiness UI from authoritative websocket `room_state` events, not local-only toggles.
+
+Why:
+- Keeps room seat/readiness state consistent across tabs and clients.
+- Avoids UI drift where local "ready" appears set but server does not accept state.
+- Preserves server-authoritative lifecycle (`waiting -> active`) as the single source of truth.
+
+Impact:
+- `client/src/features/ws/useWsSync.ts` now opens websocket, sends `join_room`, and hydrates room state from inbound `room_state`.
+- Ready button dispatches real `ready` payloads (`roomId`, `playerId`, `ready`) instead of local-only state updates.
+- Tab-scoped player identity is persisted via `sessionStorage` for multi-tab local testing.
+
+---
+
+## 12. Client Interaction Testing Baseline
+
+Decision:
+Introduce a lightweight client test harness focused on waiting-room rendering and action dispatch.
+
+Why:
+- Protects the most regression-prone surface introduced in commit 19: UI state mapping + ready intent dispatch.
+- Enables fast confidence checks during rapid UI iteration.
+- Establishes reusable tooling for upcoming board interaction tests.
+
+Impact:
+- Added Vitest + Testing Library setup (`client/vite.config.ts`, `client/src/test/setup.ts`, `client/package.json` scripts).
+- Added `client/src/features/room/WaitingRoomPanel.test.tsx` covering:
+- state rendering (`ready_up`, `queued`, `unready`, waiting/active phase)
+- action dispatch (`onToggleReady`)
+- disabled controls for non-seated users

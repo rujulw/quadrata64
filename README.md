@@ -59,9 +59,9 @@ WebSocket server default: `ws://localhost:3000`
 ## Known Gaps
 - No matchmaking system yet (manual room pairing).
 - No persistent game storage.
-- No clock / time control implementation.
-- No comprehensive test suite yet.
-- Waiting-room and analyzer client flows are in active implementation.
+- No server-enforced clock / time control implementation yet (client selector only).
+- No end-to-end multiplayer test suite yet (initial client interaction tests are in place).
+- Board interaction and analyzer client flows are still in active implementation.
 
 ## Development Workflow
 - Branch naming: `feat/<branch-name>`

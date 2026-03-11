@@ -1,5 +1,29 @@
 # Bug Log
 
+## 2026-03-11 — Gameplay side panel lacked synchronized move/result visibility
+- Symptom: `/play` showed room controls but did not surface move history, turn state, or terminal result context in the side panel.
+- Root cause: Client state adapter tracked only room/game snapshots without explicit move-feed projection.
+- Fix: Added move-feed derivation in websocket sync layer, terminal result formatting, and integrated panel UI for turn indicator + move feed + result label.
+- Files: `client/src/features/ws/useWsSync.ts`, `client/src/pages/PlayPage.tsx`, `client/src/features/room/WaitingRoomPanel.tsx`
+
+---
+
+## 2026-03-11 — New websocket sync logic had no targeted regression tests
+- Symptom: Move-feed parsing and result mapping paths were unverified by tests, increasing risk of silent UI drift.
+- Root cause: Existing client tests covered room panel and board interactions but not websocket state adaptation internals.
+- Fix: Added `useWsSync` hook tests with mocked websocket events for init-game reset, SAN move append, dedupe behavior, and game-over result mapping.
+- Files: `client/src/features/ws/useWsSync.test.tsx`
+
+---
+
+## 2026-03-11 — Server game payload contract lacked automated verification
+- Symptom: Critical snapshot/result fields (`moveCount`, `lastMove`, checkmate result) relied on manual validation only.
+- Root cause: Backend had build/typecheck gates but no executable regression tests.
+- Fix: Added `node:test` coverage for `GameEngine` and introduced `server` `npm run test` script.
+- Files: `server/src/game/GameEngine.test.ts`, `server/package.json`
+
+---
+
 ## 2026-03-09 — React StrictMode cleanup closed websocket before handshake completion
 - Symptom: Browser surfaced `WebSocket is closed before the connection is established` during `/play` mount/unmount cycles in dev.
 - Root cause: Client cleanup path called `close()` on a `CONNECTING` socket during StrictMode double-invoke lifecycle.

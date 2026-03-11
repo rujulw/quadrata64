@@ -10,6 +10,8 @@ Current model:
 - per-session game registry and deterministic terminal-state broadcasts
 - full-bleed landing UI with motion, spotlight lighting, and dotted-map atmosphere
 - live client waiting-room sync on `/play` (join + room-state hydration + ready toggle dispatch)
+- interactive board move intent flow with legal-target guidance
+- gameplay side panel with move feed, turn indicator, and terminal result surfacing
 
 ## Repository Structure
 - `client/`: React app (Vite), board UI, websocket client integration.
@@ -34,7 +36,11 @@ Target responsibilities:
 - `src/features/board/*` owns board/game snapshot contracts and board surface rendering
 - compose feature modules in route pages (`src/pages/PlayPage.tsx`) without cross-feature coupling
 - persist tab-scoped transport identity (`sessionStorage`) for multi-tab room testing
-- run interaction coverage via Vitest + Testing Library (`src/features/room/WaitingRoomPanel.test.tsx`)
+- maintain move feed state from authoritative move events with SAN notation fallback
+- run client coverage via Vitest + Testing Library:
+- `src/features/room/WaitingRoomPanel.test.tsx`
+- `src/features/board/BoardSurface.test.tsx`
+- `src/features/ws/useWsSync.test.tsx`
 
 ### Backend (`server`)
 Current responsibilities:
@@ -112,9 +118,11 @@ Current outbound types:
 ## Known Gaps
 - No persistence across server restarts.
 - No reconnect/session recovery path.
-- No server-side automated tests yet.
-- Client tests currently cover waiting-room interaction only (no board/gameplay integration tests yet).
-- Analyzer interactions and in-game board mechanics are not fully wired on client yet.
+- No end-to-end multiplayer integration test suite.
+- No server-enforced clocks/time controls yet.
+- No draw/resign workflow yet.
+- No drag-and-drop piece interaction yet.
+- No client-side planning arrows yet.
 
 ## Environment Variables
 ### Server
@@ -130,3 +138,4 @@ Current outbound types:
 - `make typecheck`
 - `cd client && npm run test`
 - `cd client && npm run test:run`
+- `cd server && npm run test`

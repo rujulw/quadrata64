@@ -7,6 +7,12 @@ export const MESSAGE_TYPES = {
   ROOM_STATE: "room_state",
   ERROR: "error",
   MOVE: "move",
+  RESIGN: "resign",
+  DRAW_OFFER: "draw_offer",
+  DRAW_ACCEPT: "draw_accept",
+  DRAW_DECLINE: "draw_decline",
+  DRAW_OFFERED: "draw_offered",
+  DRAW_DECLINED: "draw_declined",
   GAME_OVER: "game_over",
 } as const;
 
@@ -24,6 +30,10 @@ export const ERROR_CODES = {
   GAME_ALREADY_FINISHED: "game_already_finished",
   ILLEGAL_MOVE: "illegal_move",
   WRONG_TURN_PLAYER: "wrong_turn_player",
+  DRAW_ALREADY_OFFERED: "draw_already_offered",
+  DRAW_NOT_OFFERED: "draw_not_offered",
+  DRAW_CANNOT_ACCEPT_OWN_OFFER: "draw_cannot_accept_own_offer",
+  DRAW_CANNOT_DECLINE_OWN_OFFER: "draw_cannot_decline_own_offer",
   NOT_IMPLEMENTED: "not_implemented",
 } as const;
 

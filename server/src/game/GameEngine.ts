@@ -32,6 +32,10 @@ export const GAME_ENGINE_ERRORS = {
   NOT_PLAYER_TURN: "not_player_turn",
   INVALID_MOVE_INPUT: "invalid_move_input",
   INVALID_MOVE: "invalid_move",
+  DRAW_ALREADY_OFFERED: "draw_already_offered",
+  DRAW_NOT_OFFERED: "draw_not_offered",
+  DRAW_CANNOT_ACCEPT_OWN_OFFER: "draw_cannot_accept_own_offer",
+  DRAW_CANNOT_DECLINE_OWN_OFFER: "draw_cannot_decline_own_offer",
 } as const;
 
 export type GameEngineErrorCode =
@@ -58,6 +62,22 @@ export interface MoveApplied {
   result: GameResult | null;
 }
 
+export interface DrawOffered {
+  by: GamePlayerColor;
+  snapshot: GameSnapshot;
+}
+
+export interface DrawDeclined {
+  by: GamePlayerColor;
+  snapshot: GameSnapshot;
+}
+
+export interface GameConcluded {
+  by: PlayerId;
+  snapshot: GameSnapshot;
+  result: GameResult;
+}
+
 export class GameEngine {
   static create(input: CreateGameInput): GameEngine {
     return new GameEngine(input);
@@ -71,6 +91,7 @@ export class GameEngine {
   };
   private readonly chess: Chess;
   private status: GameStatus = GAME_STATUSES.ACTIVE;
+  private drawOfferBy: GamePlayerColor | null = null;
   private lastMove: GameMoveInput | null = null;
   private result: GameResult | null = null;
   private readonly createdAt: number;
@@ -95,6 +116,7 @@ export class GameEngine {
       turn: this.mapTurn(this.chess.turn()),
       moveCount: this.chess.history().length,
       players: { ...this.players },
+      drawOfferBy: this.drawOfferBy,
       lastMove: this.lastMove ? { ...this.lastMove } : null,
       result: this.result ? { ...this.result } : null,
       createdAt: this.createdAt,
@@ -139,6 +161,7 @@ export class GameEngine {
       return this.fail(GAME_ENGINE_ERRORS.INVALID_MOVE, message);
     }
 
+    this.drawOfferBy = null;
     this.lastMove = { ...input.move };
     this.updatedAt = Date.now();
 
@@ -165,6 +188,153 @@ export class GameEngine {
       return GAME_PLAYER_COLORS.BLACK;
     }
     return null;
+  }
+
+  offerDraw(playerId: PlayerId): GameEngineResult<DrawOffered> {
+    if (this.status !== GAME_STATUSES.ACTIVE) {
+      return this.fail(
+        GAME_ENGINE_ERRORS.GAME_NOT_ACTIVE,
+        "Game is not active",
+      );
+    }
+
+    const playerColor = this.getPlayerColor(playerId);
+    if (!playerColor) {
+      return this.fail(
+        GAME_ENGINE_ERRORS.PLAYER_NOT_IN_GAME,
+        `Player '${playerId}' is not in this game`,
+      );
+    }
+
+    if (this.drawOfferBy) {
+      return this.fail(
+        GAME_ENGINE_ERRORS.DRAW_ALREADY_OFFERED,
+        "A draw offer is already pending",
+      );
+    }
+
+    this.drawOfferBy = playerColor;
+    this.updatedAt = Date.now();
+
+    return this.ok({
+      by: playerColor,
+      snapshot: this.snapshot(),
+    });
+  }
+
+  acceptDraw(playerId: PlayerId): GameEngineResult<GameConcluded> {
+    if (this.status !== GAME_STATUSES.ACTIVE) {
+      return this.fail(
+        GAME_ENGINE_ERRORS.GAME_NOT_ACTIVE,
+        "Game is not active",
+      );
+    }
+
+    const playerColor = this.getPlayerColor(playerId);
+    if (!playerColor) {
+      return this.fail(
+        GAME_ENGINE_ERRORS.PLAYER_NOT_IN_GAME,
+        `Player '${playerId}' is not in this game`,
+      );
+    }
+
+    if (!this.drawOfferBy) {
+      return this.fail(
+        GAME_ENGINE_ERRORS.DRAW_NOT_OFFERED,
+        "No draw offer is currently pending",
+      );
+    }
+
+    if (this.drawOfferBy === playerColor) {
+      return this.fail(
+        GAME_ENGINE_ERRORS.DRAW_CANNOT_ACCEPT_OWN_OFFER,
+        "Player cannot accept their own draw offer",
+      );
+    }
+
+    this.drawOfferBy = null;
+    this.status = GAME_STATUSES.FINISHED;
+    this.result = { winnerColor: null, reason: "draw" };
+    this.updatedAt = Date.now();
+
+    const snapshot = this.snapshot();
+    return this.ok({
+      by: playerId,
+      snapshot,
+      result: snapshot.result as GameResult,
+    });
+  }
+
+  declineDraw(playerId: PlayerId): GameEngineResult<DrawDeclined> {
+    if (this.status !== GAME_STATUSES.ACTIVE) {
+      return this.fail(
+        GAME_ENGINE_ERRORS.GAME_NOT_ACTIVE,
+        "Game is not active",
+      );
+    }
+
+    const playerColor = this.getPlayerColor(playerId);
+    if (!playerColor) {
+      return this.fail(
+        GAME_ENGINE_ERRORS.PLAYER_NOT_IN_GAME,
+        `Player '${playerId}' is not in this game`,
+      );
+    }
+
+    if (!this.drawOfferBy) {
+      return this.fail(
+        GAME_ENGINE_ERRORS.DRAW_NOT_OFFERED,
+        "No draw offer is currently pending",
+      );
+    }
+
+    if (this.drawOfferBy === playerColor) {
+      return this.fail(
+        GAME_ENGINE_ERRORS.DRAW_CANNOT_DECLINE_OWN_OFFER,
+        "Player cannot decline their own draw offer",
+      );
+    }
+
+    this.drawOfferBy = null;
+    this.updatedAt = Date.now();
+    return this.ok({
+      by: playerColor,
+      snapshot: this.snapshot(),
+    });
+  }
+
+  resign(playerId: PlayerId): GameEngineResult<GameConcluded> {
+    if (this.status !== GAME_STATUSES.ACTIVE) {
+      return this.fail(
+        GAME_ENGINE_ERRORS.GAME_NOT_ACTIVE,
+        "Game is not active",
+      );
+    }
+
+    const playerColor = this.getPlayerColor(playerId);
+    if (!playerColor) {
+      return this.fail(
+        GAME_ENGINE_ERRORS.PLAYER_NOT_IN_GAME,
+        `Player '${playerId}' is not in this game`,
+      );
+    }
+
+    const winnerColor =
+      playerColor === GAME_PLAYER_COLORS.WHITE
+        ? GAME_PLAYER_COLORS.BLACK
+        : GAME_PLAYER_COLORS.WHITE;
+
+    this.drawOfferBy = null;
+    this.status = GAME_STATUSES.FINISHED;
+    this.result = { winnerColor, reason: "resign" };
+    this.updatedAt = Date.now();
+
+    const snapshot = this.snapshot();
+    return this.ok({
+      by: playerId,
+      snapshot,
+      result: snapshot.result as GameResult,
+    });
   }
 
   private deriveGameResult(): GameResult {

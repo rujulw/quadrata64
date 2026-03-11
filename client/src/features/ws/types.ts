@@ -1,7 +1,15 @@
 import type { GameSnapshot, MoveFeedEntry, MoveIntent } from "../board/types";
 import type { RoomSnapshot } from "../room/types";
 
-export type ClientIntentType = "join_room" | "leave_room" | "ready" | "move";
+export type ClientIntentType =
+  | "join_room"
+  | "leave_room"
+  | "ready"
+  | "move"
+  | "resign"
+  | "draw_offer"
+  | "draw_accept"
+  | "draw_decline";
 
 export type ClientIntentEnvelope = {
   type: ClientIntentType;

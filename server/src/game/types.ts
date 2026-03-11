@@ -51,6 +51,7 @@ export interface GameSnapshot {
     white: PlayerId;
     black: PlayerId;
   };
+  drawOfferBy: GamePlayerColor | null;
   lastMove: GameMoveInput | null;
   result: GameResult | null;
   createdAt: number;

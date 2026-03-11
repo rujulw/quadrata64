@@ -26,6 +26,10 @@ Port the older websocket chess prototype into a typed, server-authoritative sess
 - [x] `/play` waiting-room websocket sync (`join_room`, `room_state` hydration, ready dispatch)
 - [x] client-side ready-state synchronization in UI (waiting/active mapped from server room state)
 - [x] initial client interaction tests for waiting-room rendering + action dispatch (Vitest + Testing Library)
+- [x] board move intent UX with legal target handling
+- [x] side-panel game telemetry (turn indicator, move feed, terminal result label)
+- [x] websocket move-feed synchronization with SAN notation fallback
+- [x] backend engine regression tests (`node:test`) for move payload/result contracts
 
 ## 1. Complete Current Branch (Final Impl + Docs)
 - [x] Implement move application path behind active-session gate.
@@ -35,12 +39,12 @@ Port the older websocket chess prototype into a typed, server-authoritative sess
 - [x] Finalize consolidated docs sync (design + bug-log + roadmap + architecture).
 
 ## Next Milestones (Immediate)
-- Expand board module beyond static 8x8 shell to render piece placement from authoritative snapshots.
-- Build interactive board move intent UX and route move dispatch through websocket adapter.
-- Reconnect/session recovery policy and resume semantics.
-- Unit tests for `RoomManager`, `GameManager`, and `GameEngine`.
-- Integration tests for websocket protocol happy path and typed error paths.
-- Add client integration tests covering multi-tab readiness-to-activation transition.
+- PR current gameplay UI + sync baseline into `development` after regression pass.
+- Add draw/resign workflow (protocol + server handling + client controls).
+- Add drag-and-drop piece interaction constrained to legal destinations.
+- Add client-side planning arrows via right-click interactions.
+- Implement authoritative time controls and synchronized clock UI.
+- Expand server test coverage for router/session integration paths.
 
 ## 2. Post-MVP Hardening
 - Add reconnection strategy for transient disconnects.
@@ -57,3 +61,4 @@ Port the older websocket chess prototype into a typed, server-authoritative sess
 - Add optional matchmaking queue.
 - Add persistence for completed games/history.
 - Add time controls and clock synchronization.
+- Continue gameplay UX polish until production release quality is reached.

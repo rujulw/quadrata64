@@ -13,6 +13,10 @@ describe("WaitingRoomPanel", () => {
         isReady={false}
         canReady
         roomPhase="waiting"
+        gameTurn="white"
+        gameStatus="active"
+        terminalResultLabel={null}
+        moveFeed={[]}
       />,
     );
 
@@ -31,6 +35,10 @@ describe("WaitingRoomPanel", () => {
         isReady={false}
         canReady
         roomPhase="waiting"
+        gameTurn="white"
+        gameStatus="active"
+        terminalResultLabel={null}
+        moveFeed={[]}
       />,
     );
 
@@ -47,6 +55,10 @@ describe("WaitingRoomPanel", () => {
         isReady
         canReady
         roomPhase="waiting"
+        gameTurn="white"
+        gameStatus="active"
+        terminalResultLabel={null}
+        moveFeed={[]}
       />,
     );
 
@@ -62,6 +74,10 @@ describe("WaitingRoomPanel", () => {
         isReady
         canReady
         roomPhase="active"
+        gameTurn="black"
+        gameStatus="active"
+        terminalResultLabel={null}
+        moveFeed={[]}
       />,
     );
 
@@ -77,10 +93,14 @@ describe("WaitingRoomPanel", () => {
         isReady={false}
         canReady={false}
         roomPhase="waiting"
+        gameTurn="white"
+        gameStatus="active"
+        terminalResultLabel={null}
+        moveFeed={[]}
       />,
     );
 
     expect(screen.getByRole("button", { name: "ready up" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: /rapid - 3 min/i })).toBeDisabled();
+    expect(screen.getByRole("combobox", { name: /time control/i })).toBeDisabled();
   });
 });

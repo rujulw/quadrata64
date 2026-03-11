@@ -14,11 +14,22 @@ const DEFAULT_ROOM: RoomSnapshot = {
 };
 
 const DEFAULT_GAME: GameSnapshot = {
-  fen: "startpos",
-  turn: "w",
+  fen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+  turn: "white",
   moveCount: 0,
   status: "active",
+  lastMove: null,
+  result: null,
 };
+
+function formatResultLabel(game: GameSnapshot): string | null {
+  if (game.status !== "finished" || !game.result) {
+    return null;
+  }
+
+  const winner = game.result.winnerColor ? `${game.result.winnerColor} wins` : "draw";
+  return `${winner} - ${game.result.reason.replace(/_/g, " ")}`;
+}
 
 function getTabPlayerId(): string {
   if (typeof window === "undefined") {
@@ -40,9 +51,11 @@ export default function PlayPage() {
   const {
     room: syncedRoom,
     game: syncedGame,
+    moveFeed,
     connect,
     disconnect,
     toggleReadyIntent,
+    dispatchMoveIntent,
   } = useWsSync({ roomId, playerId });
 
   useEffect(() => {
@@ -62,10 +75,18 @@ export default function PlayPage() {
       : room.black?.peerId === playerId
         ? room.black
         : null;
+  const currentPlayerColor =
+    room.white?.peerId === playerId
+      ? "white"
+      : room.black?.peerId === playerId
+        ? "black"
+        : null;
+  const orientation = currentPlayerColor === "black" ? "black" : "white";
 
   const isReady = Boolean(currentSeat?.isReady);
   const canReady = Boolean(currentSeat);
   const isMatching = isReady && room.phase === "waiting";
+  const terminalResultLabel = formatResultLabel(game);
 
   return (
     <section className="relative min-h-screen overflow-hidden">
@@ -76,19 +97,28 @@ export default function PlayPage() {
       />
 
       <div className="relative mx-auto w-full max-w-365 px-6 py-6 sm:px-8 lg:px-12">
-        <div className="grid min-h-[78vh] gap-4 lg:mx-auto lg:w-fit lg:grid-cols-[410px_1fr] lg:items-start lg:gap-3">
-          <div className="lg:self-stretch">
+        <div className="grid min-h-[78vh] gap-4 lg:grid-cols-[minmax(320px,40%)_minmax(0,60%)] lg:items-stretch lg:gap-4">
+          <div className="lg:h-full">
             <WaitingRoomPanel
               isMatching={isMatching}
               isReady={isReady}
               canReady={canReady}
               roomPhase={room.phase}
+              gameTurn={game.turn}
+              gameStatus={game.status}
+              terminalResultLabel={terminalResultLabel}
+              moveFeed={moveFeed}
               onToggleReady={() => toggleReadyIntent(room.roomId, playerId, !isReady)}
             />
           </div>
 
-          <div className="flex w-full justify-start">
-            <BoardSurface snapshot={game} orientation="white" />
+          <div className="flex w-full items-start justify-center">
+            <BoardSurface
+              snapshot={game}
+              orientation={orientation}
+              playerColor={currentPlayerColor}
+              onMoveIntent={(move) => dispatchMoveIntent(room.roomId, playerId, move)}
+            />
           </div>
         </div>
       </div>

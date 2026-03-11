@@ -60,8 +60,10 @@ WebSocket server default: `ws://localhost:3000`
 - No matchmaking system yet (manual room pairing).
 - No persistent game storage.
 - No server-enforced clock / time control implementation yet (client selector only).
-- No end-to-end multiplayer test suite yet (initial client interaction tests are in place).
-- Board interaction and analyzer client flows are still in active implementation.
+- No end-to-end multiplayer test suite yet.
+- No resign/draw controls yet.
+- No drag-and-drop board interaction yet.
+- No client-side planning arrows yet.
 
 ## Development Workflow
 - Branch naming: `feat/<branch-name>`

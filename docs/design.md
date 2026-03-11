@@ -206,3 +206,55 @@ Impact:
 - state rendering (`ready_up`, `queued`, `unready`, waiting/active phase)
 - action dispatch (`onToggleReady`)
 - disabled controls for non-seated users
+
+---
+
+## 13. Match Panel as Game Telemetry Surface
+
+Decision:
+Evolve the waiting-room card into a live gameplay panel that remains useful after match start.
+
+Why:
+- Keeps room controls, move history, and result status in one stable UI region.
+- Reduces context switching during play by pairing board + telemetry side-by-side.
+- Improves perceived responsiveness when authoritative updates arrive over websocket.
+
+Impact:
+- `WaitingRoomPanel` now renders:
+- turn-status indicator (`white/black to move` / finished)
+- rolling move feed grouped by move number
+- terminal result label when game is finished
+- time-control selector with animated dropdown UI
+
+---
+
+## 14. Client SAN Feed Derived from Authoritative Move Events
+
+Decision:
+Generate SAN notation client-side from authoritative `move_applied` events using a local `chess.js` instance seeded from `init_game`.
+
+Why:
+- Server payload currently provides move coordinates and snapshot, not SAN.
+- SAN improves readability of move history without changing protocol shape immediately.
+- Keeps UI move feed stable while preserving server-authoritative move legality.
+
+Impact:
+- Added move-feed state and parsing in `useWsSync`.
+- Added duplicate-move guard and bounded feed retention for UI rendering.
+- Added hook tests for init/reset, move append, and dedupe behavior.
+
+---
+
+## 15. Backend Test Baseline with `node:test`
+
+Decision:
+Introduce lightweight server tests with Node’s built-in test runner before adding a larger backend framework.
+
+Why:
+- Covers core game-result and snapshot contracts quickly with minimal tooling overhead.
+- Ensures payload-critical fields (`moveCount`, `lastMove`, `result`) stay stable.
+- Provides CI-friendly regression checks for game engine behavior.
+
+Impact:
+- Added `server/src/game/GameEngine.test.ts`.
+- Added `server` `npm run test` script (`build` + `node --test`).

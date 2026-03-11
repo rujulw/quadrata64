@@ -13,7 +13,14 @@ describe("BoardSurface", () => {
 
     render(
       <BoardSurface
-        snapshot={{ fen: START_FEN, turn: "white", moveCount: 0, status: "active" }}
+        snapshot={{
+          fen: START_FEN,
+          turn: "white",
+          moveCount: 0,
+          status: "active",
+          lastMove: null,
+          result: null,
+        }}
         orientation="white"
         playerColor="white"
         onMoveIntent={onMoveIntent}
@@ -33,7 +40,14 @@ describe("BoardSurface", () => {
 
     render(
       <BoardSurface
-        snapshot={{ fen: START_FEN, turn: "white", moveCount: 0, status: "active" }}
+        snapshot={{
+          fen: START_FEN,
+          turn: "white",
+          moveCount: 0,
+          status: "active",
+          lastMove: null,
+          result: null,
+        }}
         orientation="white"
         playerColor="white"
         onMoveIntent={onMoveIntent}

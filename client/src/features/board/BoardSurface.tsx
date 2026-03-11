@@ -42,6 +42,19 @@ function squareFromDisplayIndex(index: number, orientation: BoardOrientation): s
   return `${FILES[fileIndex]}${rank}`;
 }
 
+function isLightSquare(square: string): boolean {
+  const file = square[0];
+  const rankChar = square[1];
+  const fileIndex = FILES.indexOf(file as (typeof FILES)[number]);
+  const rank = Number(rankChar);
+  if (fileIndex < 0 || Number.isNaN(rank)) {
+    return false;
+  }
+
+  const fileNumber = fileIndex + 1;
+  return (fileNumber + rank) % 2 === 1;
+}
+
 function parseBoardPieces(fen: string): Record<string, BoardPiece> {
   const chess = new Chess();
   try {
@@ -101,10 +114,8 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
     snapshot.status === "active" && Boolean(playerColor) && snapshot.turn === playerColor;
 
   const cells = Array.from({ length: BOARD_SIZE }, (_, index) => {
-    const row = Math.floor(index / 8);
-    const col = index % 8;
-    const isLight = (row + col) % 2 === 1;
     const square = squareFromDisplayIndex(index, orientation);
+    const isLight = isLightSquare(square);
     const piece = pieces[square];
     const isSelected = selectedSquare === square;
     const isLegalTarget = legalTargets.has(square);
@@ -166,7 +177,7 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
 
         {!piece && isLegalTarget ? (
           <span className="pointer-events-none absolute inset-0 grid place-items-center">
-            <span className="h-3.5 w-3.5 rounded-full bg-app-purple-soft/70" />
+            <span className="h-3.5 w-3.5 rounded-full bg-[#8fcea2]/80" />
           </span>
         ) : null}
       </button>
@@ -174,11 +185,11 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
   });
 
   return (
-    <section className="w-fit">
+    <section className="w-full">
       <div
-        className="aspect-square"
+        className="mx-auto aspect-square"
         style={{
-          width: "min(clamp(320px, calc(100vw - 500px), 1020px), calc(100vh - 165px))",
+          width: "min(100%, calc(100vh - 165px))",
         }}
       >
         <div className="grid h-full w-full grid-cols-8 overflow-hidden rounded-lg border border-white/10">

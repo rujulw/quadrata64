@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
 
-import { GlareCard } from "../../components/ui/glare-card";
+import { Component as FluidDropdown } from "../../components/ui/fluid-dropdown";
 import { LoaderOne } from "../../components/ui/loader";
+import type { MoveFeedEntry, PlayerColor } from "../board";
 
 type WaitingRoomPanelProps = {
   onToggleReady: () => void;
@@ -9,7 +10,22 @@ type WaitingRoomPanelProps = {
   isReady: boolean;
   canReady: boolean;
   roomPhase: "waiting" | "active";
+  gameTurn: PlayerColor;
+  gameStatus: "active" | "finished";
+  terminalResultLabel: string | null;
+  moveFeed: MoveFeedEntry[];
 };
+
+const TIME_CONTROL_OPTIONS = [
+  { value: "bullet", label: "bullet", icon: "⚡", description: "1 min" },
+  { value: "rapid", label: "rapid", icon: "⚡", description: "3 min" },
+  { value: "traditional", label: "traditional", icon: "⚡", description: "10 min" },
+] as const;
+
+function getStatusLabel(gameStatus: "active" | "finished", gameTurn: PlayerColor) {
+  if (gameStatus === "finished") return "Finished";
+  return `${gameTurn} to move`;
+}
 
 export function WaitingRoomPanel({
   onToggleReady,
@@ -17,83 +33,149 @@ export function WaitingRoomPanel({
   isReady,
   canReady,
   roomPhase,
+  gameTurn,
+  gameStatus,
+  terminalResultLabel,
+  moveFeed,
 }: WaitingRoomPanelProps) {
-  const [timeControl, setTimeControl] = useState("rapid");
-  const [isTimeMenuOpen, setIsTimeMenuOpen] = useState(false);
+  const [timeControl, setTimeControl] = useState<(typeof TIME_CONTROL_OPTIONS)[number]["value"]>(
+    "rapid",
+  );
 
-  const selectedLabel = useMemo(() => {
-    if (timeControl === "bullet") return "bullet - 1 min";
-    if (timeControl === "traditional") return "traditional - 10 min";
-    return "rapid - 3 min";
-  }, [timeControl]);
+  const moveRows = useMemo(() => {
+    const sorted = [...moveFeed].sort((a, b) => a.ply - b.ply);
+    const rows = new Map<number, { moveNumber: number; white: string | null; black: string | null }>();
+
+    for (const entry of sorted) {
+      const moveNumber = Math.max(1, Math.ceil(entry.ply / 2));
+      const current = rows.get(moveNumber) ?? { moveNumber, white: null, black: null };
+      const isWhitePly = entry.ply % 2 === 1;
+
+      if (isWhitePly) {
+        current.white = entry.notation;
+      } else {
+        current.black = entry.notation;
+      }
+
+      rows.set(moveNumber, current);
+    }
+
+    return Array.from(rows.values()).slice(-8);
+  }, [moveFeed]);
 
   return (
-    <GlareCard className="p-5 lg:min-h-90">
-      <div className="space-y-5">
-        <div>
-          <h2 className="mt-1 text-3xl font-semibold tracking-tight text-white">matchmaking</h2>
-          <p className="mt-2 text-sm leading-6 text-white/60">queue up for a match!</p>
+    <section className="relative w-full overflow-hidden rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] shadow-[0_24px_80px_rgba(0,0,0,0.35)] backdrop-blur-xl lg:min-h-144">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(168,85,247,0.18),transparent_32%),radial-gradient(circle_at_bottom_right,rgba(255,255,255,0.05),transparent_28%)]" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/10" />
+
+      <div className="relative flex h-full flex-col p-6">
+        <div className="mb-6">
+          <h2 className="text-[2rem] font-semibold tracking-[-0.04em] text-white">matchmaking</h2>
         </div>
 
-        <div>
-          <div className="relative mt-2">
-            <button
-              type="button"
-              className="flex w-full items-center justify-between rounded-xl border border-white/10 bg-[#2b2f37] px-3 py-2.5 text-sm text-white transition-colors hover:border-white/20 disabled:cursor-not-allowed disabled:opacity-55"
-              onClick={() => setIsTimeMenuOpen((prev) => !prev)}
+        <div className="mb-5 rounded-2xl border border-white/10 bg-black/20 p-4 shadow-inner shadow-black/10">
+          <div>
+            <FluidDropdown
+              ariaLabel="time control"
+              value={timeControl}
+              onValueChange={(value) => setTimeControl(value as typeof timeControl)}
+              options={TIME_CONTROL_OPTIONS}
               disabled={isMatching || !canReady}
-            >
-              <span>{selectedLabel}</span>
-              <span className="text-white/55">{isTimeMenuOpen ? "▲" : "▼"}</span>
-            </button>
+              className="mx-auto w-full max-w-80"
+            />
+          </div>
 
-            {isTimeMenuOpen ? (
-              <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-20 rounded-xl border border-white/10 bg-[#2b2f37] py-1">
-                <button
-                  type="button"
-                  className="w-full px-3 py-2 text-left text-sm text-white/85 hover:bg-white/8"
-                  onClick={() => {
-                    setTimeControl("bullet");
-                    setIsTimeMenuOpen(false);
-                  }}
-                >
-                  bullet - 1 min
-                </button>
-                <button
-                  type="button"
-                  className="w-full px-3 py-2 text-left text-sm text-white/85 hover:bg-white/8"
-                  onClick={() => {
-                    setTimeControl("traditional");
-                    setIsTimeMenuOpen(false);
-                  }}
-                >
-                  traditional - 10 min
-                </button>
+          <div className="mt-3 flex min-h-8 items-center">
+            {isMatching ? (
+              <div className="inline-flex items-center gap-3 rounded-full border border-app-purple-soft/20 bg-app-purple-soft/10 px-3 py-1.5 text-sm text-white/80">
+                <LoaderOne />
+                <span>matching...</span>
               </div>
             ) : null}
           </div>
         </div>
 
-        <div className="flex h-10 items-center">
-          {isMatching ? (
-            <div className="flex items-center gap-3 pb-1 text-sm text-white/75">
-              <LoaderOne />
-              <span>matching...</span>
+        <div className="mb-6 overflow-hidden rounded-2xl border border-white/10 bg-[#111318]/70">
+          <div className="flex items-center justify-center border-b border-white/10 px-4 py-3">
+            <div className="flex items-center gap-2 text-sm font-medium tracking-[0.12em] text-white/80 lowercase">
+              <span
+                className={[
+                  "h-2.5 w-2.5 rounded-full shadow-[0_0_10px_rgba(255,255,255,0.35)]",
+                  gameStatus === "finished"
+                    ? "bg-app-purple-soft/80"
+                    : gameTurn === "white"
+                      ? "bg-white/90"
+                      : "bg-zinc-900 ring-1 ring-white/20",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+              />
+              <span>{getStatusLabel(gameStatus, gameTurn)}</span>
             </div>
-          ) : null}
+          </div>
+
+          <div className="border-b border-white/10 px-4 py-3">
+            {terminalResultLabel ? (
+              <p className="text-sm font-medium text-app-purple-soft/95">{terminalResultLabel}</p>
+            ) : null}
+          </div>
+
+          <div className="max-h-56 overflow-y-auto">
+            {moveRows.length === 0 ? (
+              <div className="px-4 py-8 text-center">
+                <p className="text-sm text-white/40">No moves yet</p>
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-[42px_1fr_1fr] border-b border-white/10 px-4 py-2 text-[11px] font-medium uppercase tracking-[0.16em] text-white/35">
+                  <span>#</span>
+                  <span>White</span>
+                  <span>Black</span>
+                </div>
+
+                {moveRows.map((row, index) => (
+                  <div
+                    key={row.moveNumber}
+                    className={[
+                      "grid grid-cols-[42px_1fr_1fr] items-center gap-3 px-4 py-3 text-sm transition-colors",
+                      index % 2 === 0 ? "bg-white/2.5" : "bg-transparent",
+                      "hover:bg-white/4",
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
+                  >
+                    <span className="font-medium text-white/35">{row.moveNumber}.</span>
+
+                    <span className="truncate font-semibold tracking-tight text-white/90">
+                      {row.white ?? <span className="text-white/20">-</span>}
+                    </span>
+
+                    <span className="truncate font-semibold tracking-tight text-white/72">
+                      {row.black ?? <span className="text-white/20">-</span>}
+                    </span>
+                  </div>
+                ))}
+              </>
+            )}
+          </div>
         </div>
 
-        <p className="text-center text-xs text-white/45">phase: {roomPhase}</p>
+        <div className="mt-auto space-y-3">
+          <p className="text-center text-[11px] uppercase tracking-[0.16em] text-white/35">
+            phase: {roomPhase}
+          </p>
 
-        <button
-          type="button"
-          className="mx-auto w-fit min-w-40 rounded-xl bg-app-purple-strong px-7 py-2.5 text-lg font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-55"
-          onClick={onToggleReady}
-          disabled={!canReady}
-        >
-          {isMatching ? "queued" : isReady ? "unready" : "ready up"}
-        </button>
+          <button
+            type="button"
+            aria-label={isMatching ? "queued" : isReady ? "unready" : "ready up"}
+            className="mx-auto block h-auto! rounded-xl bg-app-purple-strong px-8! py-4! text-4xl! font-bold! leading-none text-white shadow-[0_10px_28px_rgba(124,95,255,0.45)] hover:cursor-pointer disabled:cursor-not-allowed disabled:opacity-55"
+            onClick={onToggleReady}
+            disabled={!canReady}
+          >
+            ready up
+          </button>
+        </div>
       </div>
-    </GlareCard>
+    </section>
   );
 }

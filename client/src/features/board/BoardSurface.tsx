@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type DragEvent } from "react";
 import { Chess } from "chess.js";
 
 import type { BoardOrientation, GameSnapshot, MoveIntent, PlayerColor } from "./types";
@@ -100,9 +100,11 @@ function deriveLegalTargets(fen: string, fromSquare: string | null): Set<string>
 
 export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent }: BoardSurfaceProps) {
   const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
+  const [draggedSquare, setDraggedSquare] = useState<string | null>(null);
 
   useEffect(() => {
     setSelectedSquare(null);
+    setDraggedSquare(null);
   }, [snapshot.fen]);
 
   const pieces = useMemo(() => parseBoardPieces(snapshot.fen), [snapshot.fen]);
@@ -112,6 +114,18 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
   );
   const canInteract =
     snapshot.status === "active" && Boolean(playerColor) && snapshot.turn === playerColor;
+  const ownedColor = playerColor === "white" ? "w" : "b";
+
+  const dispatchMove = (from: string, to: string) => {
+    const selectedPiece = pieces[from];
+    const reachesBackRank =
+      selectedPiece?.type === "p" && (to.endsWith("1") || to.endsWith("8"));
+    onMoveIntent({
+      from,
+      to,
+      promotion: reachesBackRank ? "q" : undefined,
+    });
+  };
 
   const cells = Array.from({ length: BOARD_SIZE }, (_, index) => {
     const square = squareFromDisplayIndex(index, orientation);
@@ -120,6 +134,8 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
     const isSelected = selectedSquare === square;
     const isLegalTarget = legalTargets.has(square);
 
+    const isOwnedPiece = Boolean(piece && piece.color === ownedColor);
+
     const handleClick = () => {
       if (!canInteract || !playerColor) {
         setSelectedSquare(null);
@@ -127,25 +143,49 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
       }
 
       if (selectedSquare && isLegalTarget) {
-        const selectedPiece = pieces[selectedSquare];
-        const reachesBackRank =
-          selectedPiece?.type === "p" && (square.endsWith("1") || square.endsWith("8"));
-        onMoveIntent({
-          from: selectedSquare,
-          to: square,
-          promotion: reachesBackRank ? "q" : undefined,
-        });
+        dispatchMove(selectedSquare, square);
         setSelectedSquare(null);
         return;
       }
 
-      const ownedColor = playerColor === "white" ? "w" : "b";
-      if (piece && piece.color === ownedColor) {
+      if (isOwnedPiece) {
         setSelectedSquare(square);
         return;
       }
 
       setSelectedSquare(null);
+    };
+
+    const handleDragStart = (event: DragEvent<HTMLButtonElement>) => {
+      if (!canInteract || !isOwnedPiece) {
+        event.preventDefault();
+        return;
+      }
+      setDraggedSquare(square);
+      setSelectedSquare(square);
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", square);
+    };
+
+    const handleDragOver = (event: DragEvent<HTMLButtonElement>) => {
+      if (draggedSquare && legalTargets.has(square)) {
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "move";
+      }
+    };
+
+    const handleDrop = (event: DragEvent<HTMLButtonElement>) => {
+      if (!draggedSquare || !legalTargets.has(square)) {
+        return;
+      }
+      event.preventDefault();
+      dispatchMove(draggedSquare, square);
+      setDraggedSquare(null);
+      setSelectedSquare(null);
+    };
+
+    const handleDragEnd = () => {
+      setDraggedSquare(null);
     };
 
     return (
@@ -155,6 +195,11 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
         data-square={square}
         aria-label={square}
         onClick={handleClick}
+        onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
+        onDragEnd={handleDragEnd}
+        draggable={Boolean(canInteract && isOwnedPiece)}
         className={[
           "relative aspect-square",
           isLight ? "bg-neutral-200" : "bg-board-dark",
@@ -169,7 +214,12 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
             <img
               src={PIECE_SYMBOLS[`${piece.color}${piece.type}`]}
               alt={`${piece.color === "w" ? "white" : "black"} ${piece.type}`}
-              className="h-full w-full select-none object-contain"
+              className={[
+                "h-full w-full select-none object-contain",
+                draggedSquare === square ? "opacity-35" : "",
+              ]
+                .filter(Boolean)
+                .join(" ")}
               draggable={false}
             />
           </span>

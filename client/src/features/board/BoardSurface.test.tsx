@@ -19,6 +19,14 @@ function makeSnapshot(fen: string = START_FEN) {
   };
 }
 
+function drawPlanningArrow(from: string, to: string) {
+  const fromSquare = screen.getByRole("button", { name: from });
+  const toSquare = screen.getByRole("button", { name: to });
+  fireEvent.mouseDown(fromSquare, { button: 2, clientX: 100, clientY: 100 });
+  fireEvent.mouseEnter(toSquare);
+  fireEvent.mouseUp(toSquare, { button: 2, clientX: 120, clientY: 120 });
+}
+
 describe("BoardSurface", () => {
   it("dispatches move intent for a legal move path", async () => {
     const onMoveIntent = vi.fn();
@@ -123,11 +131,7 @@ describe("BoardSurface", () => {
   it("clears planning marks when left-clicking any board square", () => {
     render(<BoardSurface snapshot={makeSnapshot()} orientation="white" playerColor="white" onMoveIntent={vi.fn()} />);
 
-    const from = screen.getByRole("button", { name: "e2" });
-    const to = screen.getByRole("button", { name: "e4" });
-    fireEvent.mouseDown(from, { button: 2, clientX: 100, clientY: 100 });
-    fireEvent.mouseEnter(to);
-    fireEvent.mouseUp(to, { button: 2, clientX: 120, clientY: 120 });
+    drawPlanningArrow("e2", "e4");
     expect(screen.getByTestId("board-root").querySelector('[data-plan-arrow="e2-e4"]')).not.toBeNull();
 
     fireEvent.mouseDown(screen.getByRole("button", { name: "a3" }), { button: 0, clientX: 80, clientY: 80 });
@@ -151,19 +155,41 @@ describe("BoardSurface", () => {
   it("adds and removes planning arrows via right-click drag", () => {
     render(<BoardSurface snapshot={makeSnapshot()} orientation="white" playerColor="white" onMoveIntent={vi.fn()} />);
 
-    const from = screen.getByRole("button", { name: "e2" });
-    const to = screen.getByRole("button", { name: "e4" });
-    fireEvent.mouseDown(from, { button: 2, clientX: 100, clientY: 100 });
-    fireEvent.mouseEnter(to);
-    fireEvent.mouseUp(to, { button: 2, clientX: 120, clientY: 120 });
+    drawPlanningArrow("e2", "e4");
 
     expect(screen.getByTestId("board-root").querySelector('[data-plan-arrow="e2-e4"]')).not.toBeNull();
 
-    fireEvent.mouseDown(from, { button: 2, clientX: 100, clientY: 100 });
-    fireEvent.mouseEnter(to);
-    fireEvent.mouseUp(to, { button: 2, clientX: 120, clientY: 120 });
+    drawPlanningArrow("e2", "e4");
 
     expect(screen.getByTestId("board-root").querySelector('[data-plan-arrow="e2-e4"]')).toBeNull();
+  });
+
+  it("removes only the targeted arrow when toggling one of multiple arrows", () => {
+    render(<BoardSurface snapshot={makeSnapshot()} orientation="white" playerColor="white" onMoveIntent={vi.fn()} />);
+
+    drawPlanningArrow("e2", "e4");
+    drawPlanningArrow("g1", "f3");
+    expect(screen.getByTestId("board-root").querySelector('[data-plan-arrow="e2-e4"]')).not.toBeNull();
+    expect(screen.getByTestId("board-root").querySelector('[data-plan-arrow="g1-f3"]')).not.toBeNull();
+
+    drawPlanningArrow("e2", "e4");
+
+    expect(screen.getByTestId("board-root").querySelector('[data-plan-arrow="e2-e4"]')).toBeNull();
+    expect(screen.getByTestId("board-root").querySelector('[data-plan-arrow="g1-f3"]')).not.toBeNull();
+  });
+
+  it("resets all arrows when left-clicking elsewhere on the board", () => {
+    render(<BoardSurface snapshot={makeSnapshot()} orientation="white" playerColor="white" onMoveIntent={vi.fn()} />);
+
+    drawPlanningArrow("e2", "e4");
+    drawPlanningArrow("g1", "f3");
+    expect(screen.getByTestId("board-root").querySelector('[data-plan-arrow="e2-e4"]')).not.toBeNull();
+    expect(screen.getByTestId("board-root").querySelector('[data-plan-arrow="g1-f3"]')).not.toBeNull();
+
+    fireEvent.mouseDown(screen.getByRole("button", { name: "a3" }), { button: 0, clientX: 80, clientY: 80 });
+
+    expect(screen.getByTestId("board-root").querySelector('[data-plan-arrow="e2-e4"]')).toBeNull();
+    expect(screen.getByTestId("board-root").querySelector('[data-plan-arrow="g1-f3"]')).toBeNull();
   });
 
   it("resets active move selection when planning starts with right-click", async () => {

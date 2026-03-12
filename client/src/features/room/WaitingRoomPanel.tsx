@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { Flag, Handshake } from "lucide-react";
 
 import { Component as FluidDropdown } from "../../components/ui/fluid-dropdown";
 import { LoaderOne } from "../../components/ui/loader";
@@ -59,6 +60,7 @@ export function WaitingRoomPanel({
   const [timeControl, setTimeControl] = useState<(typeof TIME_CONTROL_OPTIONS)[number]["value"]>(
     "rapid",
   );
+  const showMatchFace = roomPhase === "active";
 
   const moveRows = useMemo(() => {
     const sorted = [...moveFeed].sort((a, b) => a.ply - b.ply);
@@ -87,10 +89,6 @@ export function WaitingRoomPanel({
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/10" />
 
       <div className="relative flex h-full flex-col p-6">
-        <div className="mb-6">
-          <h2 className="text-[2rem] font-semibold tracking-[-0.04em] text-white">matchmaking</h2>
-        </div>
-
         <div className="mb-5 rounded-2xl border border-white/10 bg-black/20 p-4 shadow-inner shadow-black/10">
           <div>
             <FluidDropdown
@@ -102,139 +100,165 @@ export function WaitingRoomPanel({
               className="mx-auto w-full max-w-80"
             />
           </div>
-
-          <div className="mt-3 flex min-h-8 items-center">
-            {isMatching ? (
-              <div className="inline-flex items-center gap-3 rounded-full border border-app-purple-soft/20 bg-app-purple-soft/10 px-3 py-1.5 text-sm text-white/80">
-                <LoaderOne />
-                <span>matching...</span>
-              </div>
-            ) : null}
-          </div>
         </div>
 
-        <div className="mb-6 overflow-hidden rounded-2xl border border-white/10 bg-[#111318]/70">
-          <div className="flex items-center justify-center border-b border-white/10 px-4 py-3">
-            <div className="flex items-center gap-2 text-sm font-medium tracking-[0.12em] text-white/80 lowercase">
-              <span
-                className={[
-                  "h-2.5 w-2.5 rounded-full shadow-[0_0_10px_rgba(255,255,255,0.35)]",
-                  gameStatus === "finished"
-                    ? "bg-app-purple-soft/80"
-                    : gameTurn === "white"
-                      ? "bg-white/90"
-                      : "bg-zinc-900 ring-1 ring-white/20",
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
-              />
-              <span>{getStatusLabel(gameStatus, gameTurn)}</span>
-            </div>
-          </div>
-
-          <div className="border-b border-white/10 px-4 py-3">
-            {terminalResultLabel ? (
-              <p className="text-sm font-medium text-app-purple-soft/95">{terminalResultLabel}</p>
-            ) : drawOfferLabel ? (
-              <p className="text-sm font-medium text-[#b8d7c2]">{drawOfferLabel}</p>
-            ) : null}
-          </div>
-
-          <div className="max-h-56 overflow-y-auto">
-            {moveRows.length === 0 ? (
-              <div className="px-4 py-8 text-center">
-                <p className="text-sm text-white/40">No moves yet</p>
-              </div>
-            ) : (
-              <>
-                <div className="grid grid-cols-[42px_1fr_1fr] border-b border-white/10 px-4 py-2 text-[11px] font-medium uppercase tracking-[0.16em] text-white/35">
-                  <span>#</span>
-                  <span>White</span>
-                  <span>Black</span>
-                </div>
-
-                {moveRows.map((row, index) => (
-                  <div
-                    key={row.moveNumber}
-                    className={[
-                      "grid grid-cols-[42px_1fr_1fr] items-center gap-3 px-4 py-3 text-sm transition-colors",
-                      index % 2 === 0 ? "bg-white/2.5" : "bg-transparent",
-                      "hover:bg-white/4",
-                    ]
-                      .filter(Boolean)
-                      .join(" ")}
-                  >
-                    <span className="font-medium text-white/35">{row.moveNumber}.</span>
-
-                    <span className="truncate font-semibold tracking-tight text-white/90">
-                      {row.white ?? <span className="text-white/20">-</span>}
-                    </span>
-
-                    <span className="truncate font-semibold tracking-tight text-white/72">
-                      {row.black ?? <span className="text-white/20">-</span>}
-                    </span>
-                  </div>
-                ))}
-              </>
-            )}
-          </div>
-        </div>
-
-        <div className="mt-auto space-y-3">
-          <div className="flex flex-wrap items-center justify-center gap-2">
-            <button
-              type="button"
-              onClick={onResign}
-              disabled={!canResign}
-              className="rounded-lg border border-red-300/20 bg-red-300/8 px-3 py-1.5 text-xs font-medium tracking-wide text-red-100 transition hover:bg-red-300/15 disabled:cursor-not-allowed disabled:opacity-45"
+        <div className="mb-6 h-110 perspective-distant">
+          <div
+            className={[
+              "relative h-full w-full rounded-2xl border border-white/10 bg-[#111318]/70 transition-transform duration-700 transform-3d",
+              showMatchFace ? "transform-[rotateY(180deg)]" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+          >
+            <div
+              aria-hidden={showMatchFace}
+              className="absolute inset-0 flex flex-col justify-between p-5 backface-hidden"
             >
-              resign
-            </button>
+              <div className="space-y-3">
+                <p className="text-xs font-medium tracking-[0.18em] text-white/45 uppercase">queue</p>
+                <p className="text-sm leading-6 text-white/65">
+                  ready up to enter queue. this card flips to live match controls once an opponent is found.
+                </p>
+              </div>
 
-            {canAcceptDraw || canDeclineDraw ? (
-              <>
-                <button
-                  type="button"
-                  onClick={onAcceptDraw}
-                  disabled={!canAcceptDraw}
-                  className="rounded-lg border border-emerald-300/20 bg-emerald-300/8 px-3 py-1.5 text-xs font-medium tracking-wide text-emerald-100 transition hover:bg-emerald-300/15 disabled:cursor-not-allowed disabled:opacity-45"
-                >
-                  accept draw
-                </button>
-                <button
-                  type="button"
-                  onClick={onDeclineDraw}
-                  disabled={!canDeclineDraw}
-                  className="rounded-lg border border-white/15 bg-white/8 px-3 py-1.5 text-xs font-medium tracking-wide text-white/85 transition hover:bg-white/14 disabled:cursor-not-allowed disabled:opacity-45"
-                >
-                  decline draw
-                </button>
-              </>
-            ) : (
+              <div className="flex min-h-12 items-center justify-center">
+                {isMatching ? (
+                  <div className="inline-flex items-center gap-3 rounded-full border border-app-purple-soft/20 bg-app-purple-soft/10 px-3 py-1.5 text-sm text-white/80">
+                    <LoaderOne />
+                    <span>matching...</span>
+                  </div>
+                ) : null}
+              </div>
+
               <button
                 type="button"
-                onClick={onOfferDraw}
-                disabled={!canOfferDraw}
-                className="rounded-lg border border-[#b8d7c2]/25 bg-[#b8d7c2]/10 px-3 py-1.5 text-xs font-medium tracking-wide text-[#d8f0df] transition hover:bg-[#b8d7c2]/18 disabled:cursor-not-allowed disabled:opacity-45"
+                aria-label={isMatching ? "queued" : isReady ? "unready" : "ready up"}
+                className="mx-auto block h-auto! rounded-xl bg-app-purple-strong px-8! py-4! text-4xl! font-bold! leading-none text-white shadow-[0_10px_28px_rgba(124,95,255,0.45)] hover:cursor-pointer disabled:cursor-not-allowed disabled:opacity-55"
+                onClick={onToggleReady}
+                disabled={!canReady}
               >
-                offer draw
+                {isMatching ? "queued" : isReady ? "unready" : "ready up"}
               </button>
-            )}
+            </div>
+
+            <div
+              aria-hidden={!showMatchFace}
+              className="absolute inset-0 transform-[rotateY(180deg)] backface-hidden"
+            >
+              <div className="flex h-full flex-col overflow-hidden">
+                <div className="flex items-center justify-center border-b border-white/10 px-4 py-3">
+                  <div className="flex items-center gap-2 text-sm font-medium tracking-[0.12em] text-white/80 lowercase">
+                    <span
+                      className={[
+                        "h-2.5 w-2.5 rounded-full shadow-[0_0_10px_rgba(255,255,255,0.35)]",
+                        gameStatus === "finished"
+                          ? "bg-app-purple-soft/80"
+                          : gameTurn === "white"
+                            ? "bg-white/90"
+                            : "bg-zinc-900 ring-1 ring-white/20",
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                    />
+                    <span>{getStatusLabel(gameStatus, gameTurn)}</span>
+                  </div>
+                </div>
+
+                <div className="border-b border-white/10 px-4 py-3">
+                  {terminalResultLabel ? (
+                    <p className="text-sm font-medium text-app-purple-soft/95">{terminalResultLabel}</p>
+                  ) : drawOfferLabel ? (
+                    <p className="text-sm font-medium text-[#b8d7c2]">{drawOfferLabel}</p>
+                  ) : null}
+                </div>
+
+                <div className="max-h-56 flex-1 overflow-y-auto">
+                  {moveRows.length === 0 ? (
+                    <div className="px-4 py-8 text-center">
+                      <p className="text-sm text-white/40">No moves yet</p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="grid grid-cols-[42px_1fr_1fr] border-b border-white/10 px-4 py-2 text-[11px] font-medium uppercase tracking-[0.16em] text-white/35">
+                        <span>#</span>
+                        <span>White</span>
+                        <span>Black</span>
+                      </div>
+
+                      {moveRows.map((row, index) => (
+                        <div
+                          key={row.moveNumber}
+                          className={[
+                            "grid grid-cols-[42px_1fr_1fr] items-center gap-3 px-4 py-3 text-sm transition-colors",
+                            index % 2 === 0 ? "bg-white/2.5" : "bg-transparent",
+                            "hover:bg-white/4",
+                          ]
+                            .filter(Boolean)
+                            .join(" ")}
+                        >
+                          <span className="font-medium text-white/35">{row.moveNumber}.</span>
+
+                          <span className="truncate font-semibold tracking-tight text-white/90">
+                            {row.white ?? <span className="text-white/20">-</span>}
+                          </span>
+
+                          <span className="truncate font-semibold tracking-tight text-white/72">
+                            {row.black ?? <span className="text-white/20">-</span>}
+                          </span>
+                        </div>
+                      ))}
+                    </>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap items-center justify-center gap-2 border-t border-white/10 px-4 py-3">
+                  <button
+                    type="button"
+                    aria-label="resign"
+                    onClick={onResign}
+                    disabled={!canResign}
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-red-300/20 bg-red-300/8 text-red-100 transition hover:bg-red-300/15 disabled:cursor-not-allowed disabled:opacity-45"
+                  >
+                    <Flag className="h-4 w-4" />
+                  </button>
+
+                  {canAcceptDraw || canDeclineDraw ? (
+                    <>
+                      <button
+                        type="button"
+                        aria-label="accept draw"
+                        onClick={onAcceptDraw}
+                        disabled={!canAcceptDraw}
+                        className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-emerald-300/20 bg-emerald-300/8 text-emerald-100 transition hover:bg-emerald-300/15 disabled:cursor-not-allowed disabled:opacity-45"
+                      >
+                        <Handshake className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        aria-label="decline draw"
+                        onClick={onDeclineDraw}
+                        disabled={!canDeclineDraw}
+                        className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-white/15 bg-white/8 text-lg leading-none text-white/85 transition hover:bg-white/14 disabled:cursor-not-allowed disabled:opacity-45"
+                      >
+                        ×
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      aria-label="offer draw"
+                      onClick={onOfferDraw}
+                      disabled={!canOfferDraw}
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-[#b8d7c2]/25 bg-[#b8d7c2]/10 text-[#d8f0df] transition hover:bg-[#b8d7c2]/18 disabled:cursor-not-allowed disabled:opacity-45"
+                    >
+                      <Handshake className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
-
-          <p className="text-center text-[11px] uppercase tracking-[0.16em] text-white/35">
-            phase: {roomPhase}
-          </p>
-
-          <button
-            type="button"
-            aria-label={isMatching ? "queued" : isReady ? "unready" : "ready up"}
-            className="mx-auto block h-auto! rounded-xl bg-app-purple-strong px-8! py-4! text-4xl! font-bold! leading-none text-white shadow-[0_10px_28px_rgba(124,95,255,0.45)] hover:cursor-pointer disabled:cursor-not-allowed disabled:opacity-55"
-            onClick={onToggleReady}
-            disabled={!canReady}
-          >
-            ready up
-          </button>
         </div>
       </div>
     </section>

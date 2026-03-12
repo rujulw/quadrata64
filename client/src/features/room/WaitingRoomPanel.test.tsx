@@ -30,7 +30,6 @@ describe("WaitingRoomPanel", () => {
     );
 
     expect(screen.getByRole("button", { name: "ready up" })).toBeEnabled();
-    expect(screen.getByText("phase: waiting")).toBeInTheDocument();
   });
 
   it("dispatches ready toggle when ready button is clicked", async () => {
@@ -93,7 +92,7 @@ describe("WaitingRoomPanel", () => {
     expect(screen.getByRole("button", { name: "queued" })).toBeEnabled();
   });
 
-  it("renders unready state when room is active", () => {
+  it("renders match face when room is active", () => {
     render(
       <WaitingRoomPanel
         onToggleReady={vi.fn()}
@@ -117,8 +116,9 @@ describe("WaitingRoomPanel", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: "unready" })).toBeEnabled();
-    expect(screen.getByText("phase: active")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "unready" })).not.toBeInTheDocument();
+    expect(screen.getByText("black to move")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "offer draw" })).toBeEnabled();
   });
 
   it("disables actions when player has no seat", () => {

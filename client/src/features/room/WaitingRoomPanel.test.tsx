@@ -180,4 +180,64 @@ describe("WaitingRoomPanel", () => {
     await user.click(screen.getByRole("button", { name: "accept draw" }));
     expect(onAcceptDraw).toHaveBeenCalledTimes(1);
   });
+
+  it("dispatches draw offer when no pending offer exists", async () => {
+    const onOfferDraw = vi.fn();
+    const user = userEvent.setup();
+
+    render(
+      <WaitingRoomPanel
+        onToggleReady={vi.fn()}
+        onResign={vi.fn()}
+        onOfferDraw={onOfferDraw}
+        onAcceptDraw={vi.fn()}
+        onDeclineDraw={vi.fn()}
+        isMatching={false}
+        isReady
+        canReady
+        canResign
+        canOfferDraw
+        canAcceptDraw={false}
+        canDeclineDraw={false}
+        roomPhase="active"
+        gameTurn="white"
+        gameStatus="active"
+        terminalResultLabel={null}
+        drawOfferLabel={null}
+        moveFeed={[]}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "offer draw" }));
+    expect(onOfferDraw).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows draw response controls instead of offer button when pending offer exists", () => {
+    render(
+      <WaitingRoomPanel
+        onToggleReady={vi.fn()}
+        onResign={vi.fn()}
+        onOfferDraw={vi.fn()}
+        onAcceptDraw={vi.fn()}
+        onDeclineDraw={vi.fn()}
+        isMatching={false}
+        isReady
+        canReady
+        canResign
+        canOfferDraw={false}
+        canAcceptDraw
+        canDeclineDraw
+        roomPhase="active"
+        gameTurn="black"
+        gameStatus="active"
+        terminalResultLabel={null}
+        drawOfferLabel="white offered draw"
+        moveFeed={[]}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: "offer draw" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "accept draw" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "decline draw" })).toBeEnabled();
+  });
 });

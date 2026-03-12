@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { GameEngine } from "./GameEngine";
+import { GAME_ENGINE_ERRORS, GameEngine } from "./GameEngine";
 
 describe("GameEngine", () => {
   it("includes move payload fields and lastMove in snapshot after applyMove", () => {
@@ -116,5 +116,87 @@ describe("GameEngine", () => {
     assert.equal(declineResult.data.snapshot.status, "active");
     assert.equal(declineResult.data.snapshot.drawOfferBy, null);
     assert.equal(declineResult.data.snapshot.result, null);
+  });
+
+  it("rejects duplicate draw offers while one is pending", () => {
+    const engine = GameEngine.create({
+      gameId: "g-6",
+      sessionId: "room-6",
+      players: { white: "w-6", black: "b-6" },
+    });
+
+    const firstOffer = engine.offerDraw("w-6");
+    assert.equal(firstOffer.ok, true);
+
+    const secondOffer = engine.offerDraw("b-6");
+    assert.equal(secondOffer.ok, false);
+    if (secondOffer.ok) return;
+    assert.equal(secondOffer.error, GAME_ENGINE_ERRORS.DRAW_ALREADY_OFFERED);
+  });
+
+  it("rejects accepting a draw when no draw is pending", () => {
+    const engine = GameEngine.create({
+      gameId: "g-7",
+      sessionId: "room-7",
+      players: { white: "w-7", black: "b-7" },
+    });
+
+    const acceptResult = engine.acceptDraw("b-7");
+    assert.equal(acceptResult.ok, false);
+    if (acceptResult.ok) return;
+    assert.equal(acceptResult.error, GAME_ENGINE_ERRORS.DRAW_NOT_OFFERED);
+  });
+
+  it("rejects accepting own draw offer", () => {
+    const engine = GameEngine.create({
+      gameId: "g-8",
+      sessionId: "room-8",
+      players: { white: "w-8", black: "b-8" },
+    });
+
+    const offerResult = engine.offerDraw("w-8");
+    assert.equal(offerResult.ok, true);
+
+    const acceptResult = engine.acceptDraw("w-8");
+    assert.equal(acceptResult.ok, false);
+    if (acceptResult.ok) return;
+    assert.equal(acceptResult.error, GAME_ENGINE_ERRORS.DRAW_CANNOT_ACCEPT_OWN_OFFER);
+  });
+
+  it("rejects declining own draw offer", () => {
+    const engine = GameEngine.create({
+      gameId: "g-9",
+      sessionId: "room-9",
+      players: { white: "w-9", black: "b-9" },
+    });
+
+    const offerResult = engine.offerDraw("w-9");
+    assert.equal(offerResult.ok, true);
+
+    const declineResult = engine.declineDraw("w-9");
+    assert.equal(declineResult.ok, false);
+    if (declineResult.ok) return;
+    assert.equal(declineResult.error, GAME_ENGINE_ERRORS.DRAW_CANNOT_DECLINE_OWN_OFFER);
+  });
+
+  it("clears pending draw offer after a legal move", () => {
+    const engine = GameEngine.create({
+      gameId: "g-10",
+      sessionId: "room-10",
+      players: { white: "w-10", black: "b-10" },
+    });
+
+    const offerResult = engine.offerDraw("w-10");
+    assert.equal(offerResult.ok, true);
+    if (!offerResult.ok) return;
+    assert.equal(offerResult.data.snapshot.drawOfferBy, "white");
+
+    const moveResult = engine.applyMove({
+      playerId: "w-10",
+      move: { from: "e2", to: "e4" },
+    });
+    assert.equal(moveResult.ok, true);
+    if (!moveResult.ok) return;
+    assert.equal(moveResult.data.snapshot.drawOfferBy, null);
   });
 });

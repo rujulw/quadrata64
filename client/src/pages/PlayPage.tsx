@@ -18,6 +18,7 @@ const DEFAULT_GAME: GameSnapshot = {
   turn: "white",
   moveCount: 0,
   status: "active",
+  drawOfferBy: null,
   lastMove: null,
   result: null,
 };
@@ -56,6 +57,10 @@ export default function PlayPage() {
     disconnect,
     toggleReadyIntent,
     dispatchMoveIntent,
+    dispatchResignIntent,
+    dispatchDrawOfferIntent,
+    dispatchDrawAcceptIntent,
+    dispatchDrawDeclineIntent,
   } = useWsSync({ roomId, playerId });
 
   useEffect(() => {
@@ -87,6 +92,11 @@ export default function PlayPage() {
   const canReady = Boolean(currentSeat);
   const isMatching = isReady && room.phase === "waiting";
   const terminalResultLabel = formatResultLabel(game);
+  const canGameActions = Boolean(currentSeat) && room.phase === "active" && game.status === "active";
+  const canOfferDraw = canGameActions && !game.drawOfferBy;
+  const canRespondToDraw =
+    canGameActions && Boolean(game.drawOfferBy) && game.drawOfferBy !== currentPlayerColor;
+  const drawOfferLabel = game.drawOfferBy ? `${game.drawOfferBy} offered draw` : null;
 
   return (
     <section className="relative min-h-screen overflow-hidden">
@@ -108,7 +118,16 @@ export default function PlayPage() {
               gameStatus={game.status}
               terminalResultLabel={terminalResultLabel}
               moveFeed={moveFeed}
+              drawOfferLabel={drawOfferLabel}
+              canResign={canGameActions}
+              canOfferDraw={canOfferDraw}
+              canAcceptDraw={canRespondToDraw}
+              canDeclineDraw={canRespondToDraw}
               onToggleReady={() => toggleReadyIntent(room.roomId, playerId, !isReady)}
+              onResign={() => dispatchResignIntent(room.roomId, playerId)}
+              onOfferDraw={() => dispatchDrawOfferIntent(room.roomId, playerId)}
+              onAcceptDraw={() => dispatchDrawAcceptIntent(room.roomId, playerId)}
+              onDeclineDraw={() => dispatchDrawDeclineIntent(room.roomId, playerId)}
             />
           </div>
 

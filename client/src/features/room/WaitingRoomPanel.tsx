@@ -6,13 +6,22 @@ import type { MoveFeedEntry, PlayerColor } from "../board";
 
 type WaitingRoomPanelProps = {
   onToggleReady: () => void;
+  onResign: () => void;
+  onOfferDraw: () => void;
+  onAcceptDraw: () => void;
+  onDeclineDraw: () => void;
   isMatching: boolean;
   isReady: boolean;
   canReady: boolean;
+  canResign: boolean;
+  canOfferDraw: boolean;
+  canAcceptDraw: boolean;
+  canDeclineDraw: boolean;
   roomPhase: "waiting" | "active";
   gameTurn: PlayerColor;
   gameStatus: "active" | "finished";
   terminalResultLabel: string | null;
+  drawOfferLabel: string | null;
   moveFeed: MoveFeedEntry[];
 };
 
@@ -29,13 +38,22 @@ function getStatusLabel(gameStatus: "active" | "finished", gameTurn: PlayerColor
 
 export function WaitingRoomPanel({
   onToggleReady,
+  onResign,
+  onOfferDraw,
+  onAcceptDraw,
+  onDeclineDraw,
   isMatching,
   isReady,
   canReady,
+  canResign,
+  canOfferDraw,
+  canAcceptDraw,
+  canDeclineDraw,
   roomPhase,
   gameTurn,
   gameStatus,
   terminalResultLabel,
+  drawOfferLabel,
   moveFeed,
 }: WaitingRoomPanelProps) {
   const [timeControl, setTimeControl] = useState<(typeof TIME_CONTROL_OPTIONS)[number]["value"]>(
@@ -117,6 +135,8 @@ export function WaitingRoomPanel({
           <div className="border-b border-white/10 px-4 py-3">
             {terminalResultLabel ? (
               <p className="text-sm font-medium text-app-purple-soft/95">{terminalResultLabel}</p>
+            ) : drawOfferLabel ? (
+              <p className="text-sm font-medium text-[#b8d7c2]">{drawOfferLabel}</p>
             ) : null}
           </div>
 
@@ -161,6 +181,47 @@ export function WaitingRoomPanel({
         </div>
 
         <div className="mt-auto space-y-3">
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <button
+              type="button"
+              onClick={onResign}
+              disabled={!canResign}
+              className="rounded-lg border border-red-300/20 bg-red-300/8 px-3 py-1.5 text-xs font-medium tracking-wide text-red-100 transition hover:bg-red-300/15 disabled:cursor-not-allowed disabled:opacity-45"
+            >
+              resign
+            </button>
+
+            {canAcceptDraw || canDeclineDraw ? (
+              <>
+                <button
+                  type="button"
+                  onClick={onAcceptDraw}
+                  disabled={!canAcceptDraw}
+                  className="rounded-lg border border-emerald-300/20 bg-emerald-300/8 px-3 py-1.5 text-xs font-medium tracking-wide text-emerald-100 transition hover:bg-emerald-300/15 disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                  accept draw
+                </button>
+                <button
+                  type="button"
+                  onClick={onDeclineDraw}
+                  disabled={!canDeclineDraw}
+                  className="rounded-lg border border-white/15 bg-white/8 px-3 py-1.5 text-xs font-medium tracking-wide text-white/85 transition hover:bg-white/14 disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                  decline draw
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={onOfferDraw}
+                disabled={!canOfferDraw}
+                className="rounded-lg border border-[#b8d7c2]/25 bg-[#b8d7c2]/10 px-3 py-1.5 text-xs font-medium tracking-wide text-[#d8f0df] transition hover:bg-[#b8d7c2]/18 disabled:cursor-not-allowed disabled:opacity-45"
+              >
+                offer draw
+              </button>
+            )}
+          </div>
+
           <p className="text-center text-[11px] uppercase tracking-[0.16em] text-white/35">
             phase: {roomPhase}
           </p>

@@ -18,6 +18,11 @@ type BoardPiece = {
   type: "p" | "n" | "b" | "r" | "q" | "k";
 };
 
+type PlanningArrow = {
+  from: string;
+  to: string;
+};
+
 const PIECE_SYMBOLS: Record<`${BoardPiece["color"]}${BoardPiece["type"]}`, string> = {
   wp: "/piece/cburnett/wP.svg",
   wn: "/piece/cburnett/wN.svg",
@@ -53,6 +58,27 @@ function isLightSquare(square: string): boolean {
 
   const fileNumber = fileIndex + 1;
   return (fileNumber + rank) % 2 === 1;
+}
+
+function displayCoordsFromSquare(square: string, orientation: BoardOrientation): { row: number; col: number } {
+  const file = square[0];
+  const rank = Number(square[1]);
+  const fileIndex = FILES.indexOf(file as (typeof FILES)[number]);
+  if (fileIndex < 0 || Number.isNaN(rank)) {
+    return { row: 0, col: 0 };
+  }
+
+  const col = orientation === "white" ? fileIndex : 7 - fileIndex;
+  const row = orientation === "white" ? 8 - rank : rank - 1;
+  return { row, col };
+}
+
+function squareCenterPercent(square: string, orientation: BoardOrientation): { x: number; y: number } {
+  const { row, col } = displayCoordsFromSquare(square, orientation);
+  return {
+    x: ((col + 0.5) / 8) * 100,
+    y: ((row + 0.5) / 8) * 100,
+  };
 }
 
 function parseBoardPieces(fen: string): Record<string, BoardPiece> {
@@ -113,6 +139,10 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
   const [placedSquare, setPlacedSquare] = useState<string | null>(null);
   const [draggedPiecePreview, setDraggedPiecePreview] = useState<BoardPiece | null>(null);
   const [isDraggingVisual, setIsDraggingVisual] = useState(false);
+  const [planningArrows, setPlanningArrows] = useState<PlanningArrow[]>([]);
+  const [planningHighlights, setPlanningHighlights] = useState<string[]>([]);
+  const [planningStartSquare, setPlanningStartSquare] = useState<string | null>(null);
+  const [planningHoverSquare, setPlanningHoverSquare] = useState<string | null>(null);
 
   useEffect(() => {
     setSelectedSquare(null);
@@ -123,6 +153,10 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
     setPlacedSquare(null);
     setDraggedPiecePreview(null);
     setIsDraggingVisual(false);
+    setPlanningArrows([]);
+    setPlanningHighlights([]);
+    setPlanningStartSquare(null);
+    setPlanningHoverSquare(null);
     dragStartPointerRef.current = null;
     if (placeAnimationTimeoutRef.current !== null) {
       window.clearTimeout(placeAnimationTimeoutRef.current);
@@ -179,6 +213,7 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
     optimisticFen === null;
   const ownedColor = playerColor === "white" ? "w" : "b";
   const draggedPiece = draggedPiecePreview;
+  const planningHighlightSet = useMemo(() => new Set(planningHighlights), [planningHighlights]);
 
   useEffect(() => {
     draggedSquareRef.current = draggedSquare;
@@ -317,6 +352,47 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
     };
   }, [draggedSquare, isDraggingVisual, legalTargets, hoveredDropSquare]);
 
+  useEffect(() => {
+    if (!planningStartSquare || typeof window === "undefined") {
+      return;
+    }
+
+    const handlePlanningMouseUp = (event: MouseEvent) => {
+      if (event.button !== 2) {
+        return;
+      }
+
+      const dropSquare = getSquareAtPoint(event) ?? planningHoverSquare ?? planningStartSquare;
+      if (!dropSquare) {
+        setPlanningStartSquare(null);
+        setPlanningHoverSquare(null);
+        return;
+      }
+
+      if (dropSquare === planningStartSquare) {
+        setPlanningHighlights((prev) =>
+          prev.includes(dropSquare) ? prev.filter((sq) => sq !== dropSquare) : [...prev, dropSquare],
+        );
+      } else {
+        setPlanningArrows((prev) => {
+          const exists = prev.some((arrow) => arrow.from === planningStartSquare && arrow.to === dropSquare);
+          if (exists) {
+            return prev.filter((arrow) => !(arrow.from === planningStartSquare && arrow.to === dropSquare));
+          }
+          return [...prev, { from: planningStartSquare, to: dropSquare }];
+        });
+      }
+
+      setPlanningStartSquare(null);
+      setPlanningHoverSquare(null);
+    };
+
+    window.addEventListener("mouseup", handlePlanningMouseUp);
+    return () => {
+      window.removeEventListener("mouseup", handlePlanningMouseUp);
+    };
+  }, [planningHoverSquare, planningStartSquare]);
+
   const cells = Array.from({ length: BOARD_SIZE }, (_, index) => {
     const square = squareFromDisplayIndex(index, orientation);
     const isLight = isLightSquare(square);
@@ -326,6 +402,7 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
     const isHoveredLegalTarget = hoveredDropSquare === square && Boolean(draggedSquare) && isLegalTarget;
     const isPlaceTarget = Boolean(selectedSquare) && isLegalTarget && !draggedSquare;
     const isOwnedPiece = Boolean(piece && piece.color === ownedColor);
+    const isPlannedHighlight = planningHighlightSet.has(square);
 
     const handleClick = () => {
       if (suppressClickRef.current) {
@@ -352,6 +429,9 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
     };
 
     const handlePieceMouseDown = (event: React.MouseEvent<HTMLImageElement>) => {
+      if (event.button !== 0) {
+        return;
+      }
       if (!canInteract || !isOwnedPiece) {
         return;
       }
@@ -370,6 +450,10 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
     };
 
     const handleSquareMouseEnter = () => {
+      if (planningStartSquare) {
+        setPlanningHoverSquare(square);
+      }
+
       if (!draggedSquareRef.current) {
         return;
       }
@@ -390,6 +474,15 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
       finalizeDrag(square);
     };
 
+    const handleSquareMouseDown = (event: React.MouseEvent<HTMLButtonElement>) => {
+      if (event.button !== 2) {
+        return;
+      }
+      event.preventDefault();
+      setPlanningStartSquare(square);
+      setPlanningHoverSquare(square);
+    };
+
     return (
       <button
         key={square}
@@ -397,6 +490,7 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
         data-square={square}
         aria-label={square}
         onClick={handleClick}
+        onMouseDown={handleSquareMouseDown}
         onMouseEnter={handleSquareMouseEnter}
         onMouseUp={handleSquareMouseUp}
         draggable={false}
@@ -411,6 +505,12 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
       >
         {draggedSquare && isDraggingVisual && isLegalTarget ? (
           <span className="pointer-events-none absolute inset-0 bg-[#8fcea2]/8" />
+        ) : null}
+        {isPlannedHighlight ? (
+          <span
+            data-plan-highlight={square}
+            className="pointer-events-none absolute inset-0 bg-app-purple-soft/12 ring-2 ring-inset ring-app-purple-soft/70"
+          />
         ) : null}
         {isHoveredLegalTarget ? (
           <span className="pointer-events-none absolute inset-0 ring-2 ring-inset ring-[#8fcea2]/85" />
@@ -447,6 +547,7 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
 
   return (
     <section
+      data-testid="board-root"
       className="w-full"
       tabIndex={0}
       onKeyDown={(event) => {
@@ -459,20 +560,86 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
       }}
       onContextMenu={(event) => {
         event.preventDefault();
-        // Right-click acts as a quick interaction cancel in this phase.
-        setSelectedSquare(null);
-        setDraggedSquare(null);
-        setHoveredDropSquare(null);
-        suppressClickRef.current = false;
       }}
     >
       <div
-        className="mx-auto aspect-square"
+        className="relative mx-auto aspect-square"
         style={{
           width: "min(100%, calc(100vh - 165px))",
         }}
       >
-        <div className="grid h-full w-full grid-cols-8 overflow-hidden rounded-lg border border-white/10">{cells}</div>
+        <svg
+          className="pointer-events-none absolute inset-0 z-20"
+          viewBox="0 0 100 100"
+          preserveAspectRatio="none"
+          aria-hidden="true"
+        >
+          <defs>
+            <marker
+              id="board-plan-arrow-head"
+              markerWidth="4"
+              markerHeight="4"
+              refX="0"
+              refY="2"
+              orient="auto"
+              markerUnits="userSpaceOnUse"
+            >
+              <path d="M0,0 L4,2 L0,4 Z" fill="rgba(143,206,162,0.95)" />
+            </marker>
+          </defs>
+          {planningArrows.map((arrow) => {
+            const from = squareCenterPercent(arrow.from, orientation);
+            const to = squareCenterPercent(arrow.to, orientation);
+            const dx = to.x - from.x;
+            const dy = to.y - from.y;
+            const len = Math.hypot(dx, dy) || 1;
+            const pullBack = 1;
+            const endX = to.x - (dx / len) * pullBack;
+            const endY = to.y - (dy / len) * pullBack;
+            return (
+              <line
+                key={`${arrow.from}-${arrow.to}`}
+                data-plan-arrow={`${arrow.from}-${arrow.to}`}
+                x1={from.x}
+                y1={from.y}
+                x2={endX}
+                y2={endY}
+                stroke="rgba(143,206,162,0.95)"
+                strokeWidth="1.6"
+                strokeLinecap="butt"
+                markerEnd="url(#board-plan-arrow-head)"
+              />
+            );
+          })}
+          {planningStartSquare && planningHoverSquare && planningStartSquare !== planningHoverSquare ? (
+            (() => {
+              const from = squareCenterPercent(planningStartSquare, orientation);
+              const to = squareCenterPercent(planningHoverSquare, orientation);
+              const dx = to.x - from.x;
+              const dy = to.y - from.y;
+              const len = Math.hypot(dx, dy) || 1;
+              const pullBack = 1;
+              const endX = to.x - (dx / len) * pullBack;
+              const endY = to.y - (dy / len) * pullBack;
+              return (
+                <line
+                  x1={from.x}
+                  y1={from.y}
+                  x2={endX}
+                  y2={endY}
+                  stroke="rgba(143,206,162,0.72)"
+                  strokeWidth="1.4"
+                  strokeDasharray="3 2"
+                  strokeLinecap="butt"
+                  markerEnd="url(#board-plan-arrow-head)"
+                />
+              );
+            })()
+          ) : null}
+        </svg>
+        <div className="relative z-10 grid h-full w-full grid-cols-8 overflow-hidden rounded-lg border border-white/10">
+          {cells}
+        </div>
       </div>
       {draggedPiece && dragPointer && isDraggingVisual ? (
         <div

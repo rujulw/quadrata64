@@ -111,8 +111,27 @@ body.is-piece-dragging * {
   cursor: grabbing !important;
 }
 
+@keyframes piece-place {
+  0% {
+    transform: translateY(4px) scale(0.94);
+  }
+  60% {
+    transform: translateY(-1px) scale(1.04);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+  }
+}
+
+.piece-place-animate {
+  animation: piece-place 180ms cubic-bezier(0.2, 0.8, 0.22, 1);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .board-cell {
     transition-duration: 0ms;
+  }
+  .piece-place-animate {
+    animation-duration: 1ms;
   }
 }

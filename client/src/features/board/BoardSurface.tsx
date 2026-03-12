@@ -106,18 +106,31 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
   const draggedSquareRef = useRef<string | null>(null);
   const hoveredDropSquareRef = useRef<string | null>(null);
   const legalTargetsRef = useRef<Set<string>>(new Set());
-  const optimisticResetTimeoutRef = useRef<number | null>(null);
-  const [optimisticMove, setOptimisticMove] = useState<{ from: string; to: string; piece: BoardPiece } | null>(null);
+  const placeAnimationTimeoutRef = useRef<number | null>(null);
+  const dragCleanupFrameRef = useRef<number | null>(null);
+  const dragStartPointerRef = useRef<{ x: number; y: number } | null>(null);
+  const [optimisticFen, setOptimisticFen] = useState<string | null>(null);
+  const [placedSquare, setPlacedSquare] = useState<string | null>(null);
+  const [draggedPiecePreview, setDraggedPiecePreview] = useState<BoardPiece | null>(null);
+  const [isDraggingVisual, setIsDraggingVisual] = useState(false);
 
   useEffect(() => {
     setSelectedSquare(null);
     setDraggedSquare(null);
     setHoveredDropSquare(null);
     setDragPointer(null);
-    setOptimisticMove(null);
-    if (optimisticResetTimeoutRef.current !== null) {
-      window.clearTimeout(optimisticResetTimeoutRef.current);
-      optimisticResetTimeoutRef.current = null;
+    setOptimisticFen(null);
+    setPlacedSquare(null);
+    setDraggedPiecePreview(null);
+    setIsDraggingVisual(false);
+    dragStartPointerRef.current = null;
+    if (placeAnimationTimeoutRef.current !== null) {
+      window.clearTimeout(placeAnimationTimeoutRef.current);
+      placeAnimationTimeoutRef.current = null;
+    }
+    if (dragCleanupFrameRef.current !== null) {
+      window.cancelAnimationFrame(dragCleanupFrameRef.current);
+      dragCleanupFrameRef.current = null;
     }
     suppressClickRef.current = false;
     dropHandledRef.current = false;
@@ -128,7 +141,7 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
       return;
     }
 
-    if (draggedSquare) {
+    if (isDraggingVisual) {
       document.body.classList.add("is-piece-dragging");
     } else {
       document.body.classList.remove("is-piece-dragging");
@@ -137,35 +150,35 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
     return () => {
       document.body.classList.remove("is-piece-dragging");
     };
-  }, [draggedSquare]);
+  }, [isDraggingVisual]);
 
   useEffect(() => {
     return () => {
-      if (optimisticResetTimeoutRef.current !== null) {
-        window.clearTimeout(optimisticResetTimeoutRef.current);
+      if (placeAnimationTimeoutRef.current !== null) {
+        window.clearTimeout(placeAnimationTimeoutRef.current);
       }
+      if (dragCleanupFrameRef.current !== null) {
+        window.cancelAnimationFrame(dragCleanupFrameRef.current);
+      }
+      dragStartPointerRef.current = null;
     };
   }, []);
 
+  const displayFen = optimisticFen ?? snapshot.fen;
   const snapshotPieces = useMemo(() => parseBoardPieces(snapshot.fen), [snapshot.fen]);
-  const pieces = useMemo(() => {
-    if (!optimisticMove) {
-      return snapshotPieces;
-    }
-
-    const projected = { ...snapshotPieces };
-    delete projected[optimisticMove.from];
-    projected[optimisticMove.to] = optimisticMove.piece;
-    return projected;
-  }, [optimisticMove, snapshotPieces]);
+  const pieces = useMemo(() => parseBoardPieces(displayFen), [displayFen]);
   const moveSourceSquare = draggedSquare ?? selectedSquare;
   const legalTargets = useMemo(
     () => deriveLegalTargets(snapshot.fen, moveSourceSquare),
     [snapshot.fen, moveSourceSquare],
   );
-  const canInteract = snapshot.status === "active" && Boolean(playerColor) && snapshot.turn === playerColor;
+  const canInteract =
+    snapshot.status === "active" &&
+    Boolean(playerColor) &&
+    snapshot.turn === playerColor &&
+    optimisticFen === null;
   const ownedColor = playerColor === "white" ? "w" : "b";
-  const draggedPiece = draggedSquare ? pieces[draggedSquare] : null;
+  const draggedPiece = draggedPiecePreview;
 
   useEffect(() => {
     draggedSquareRef.current = draggedSquare;
@@ -185,32 +198,58 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
       return;
     }
     const reachesBackRank = selectedPiece.type === "p" && (to.endsWith("1") || to.endsWith("8"));
-    const projectedPiece = reachesBackRank ? { ...selectedPiece, type: "q" as const } : selectedPiece;
-    setOptimisticMove({ from, to, piece: projectedPiece });
-    if (optimisticResetTimeoutRef.current !== null) {
-      window.clearTimeout(optimisticResetTimeoutRef.current);
+    const chess = new Chess();
+    try {
+      chess.load(snapshot.fen);
+      const moved = chess.move({ from, to, promotion: reachesBackRank ? "q" : undefined });
+      if (moved) {
+        setOptimisticFen(chess.fen());
+      }
+    } catch {
+      // If local simulation fails, still emit intent and rely on server snapshot.
     }
-    optimisticResetTimeoutRef.current = window.setTimeout(() => {
-      setOptimisticMove(null);
-      optimisticResetTimeoutRef.current = null;
-    }, 1200);
+    setPlacedSquare(to);
+    if (placeAnimationTimeoutRef.current !== null) {
+      window.clearTimeout(placeAnimationTimeoutRef.current);
+    }
+    placeAnimationTimeoutRef.current = window.setTimeout(() => {
+      setPlacedSquare(null);
+      placeAnimationTimeoutRef.current = null;
+    }, 180);
     onMoveIntent({ from, to, promotion: reachesBackRank ? "q" : undefined });
   };
 
   const finalizeDrag = (dropSquare: string | null) => {
     const sourceSquare = draggedSquareRef.current;
     const currentLegalTargets = legalTargetsRef.current;
+    const isValidDrop = Boolean(sourceSquare && dropSquare && currentLegalTargets.has(dropSquare));
     if (sourceSquare && dropSquare && currentLegalTargets.has(dropSquare) && !dropHandledRef.current) {
       dropHandledRef.current = true;
       dispatchMove(sourceSquare, dropSquare);
       setSelectedSquare(null);
     }
 
-    setDraggedSquare(null);
-    setHoveredDropSquare(null);
-    setDragPointer(null);
-    draggedSquareRef.current = null;
-    hoveredDropSquareRef.current = null;
+    const cleanupDragState = () => {
+      setDraggedSquare(null);
+      setHoveredDropSquare(null);
+      setDragPointer(null);
+      setDraggedPiecePreview(null);
+      setIsDraggingVisual(false);
+      dragStartPointerRef.current = null;
+      draggedSquareRef.current = null;
+      hoveredDropSquareRef.current = null;
+    };
+    if (isValidDrop && typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
+      if (dragCleanupFrameRef.current !== null) {
+        window.cancelAnimationFrame(dragCleanupFrameRef.current);
+      }
+      dragCleanupFrameRef.current = window.requestAnimationFrame(() => {
+        cleanupDragState();
+        dragCleanupFrameRef.current = null;
+      });
+    } else {
+      cleanupDragState();
+    }
     window.setTimeout(() => {
       suppressClickRef.current = false;
       dropHandledRef.current = false;
@@ -245,6 +284,14 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
     }
 
     const handleWindowMouseMove = (event: MouseEvent) => {
+      const start = dragStartPointerRef.current;
+      if (start && !isDraggingVisual) {
+        const deltaX = event.clientX - start.x;
+        const deltaY = event.clientY - start.y;
+        if (Math.hypot(deltaX, deltaY) >= 3) {
+          setIsDraggingVisual(true);
+        }
+      }
       setDragPointer({ x: event.clientX, y: event.clientY });
       const hoveredSquare = getSquareAtPoint(event);
       if (hoveredSquare && legalTargets.has(hoveredSquare)) {
@@ -268,7 +315,7 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
       window.removeEventListener("mousemove", handleWindowMouseMove);
       window.removeEventListener("mouseup", handleWindowMouseUp);
     };
-  }, [draggedSquare, legalTargets, hoveredDropSquare]);
+  }, [draggedSquare, isDraggingVisual, legalTargets, hoveredDropSquare]);
 
   const cells = Array.from({ length: BOARD_SIZE }, (_, index) => {
     const square = squareFromDisplayIndex(index, orientation);
@@ -277,6 +324,7 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
     const isSelected = selectedSquare === square;
     const isLegalTarget = legalTargets.has(square);
     const isHoveredLegalTarget = hoveredDropSquare === square && Boolean(draggedSquare) && isLegalTarget;
+    const isPlaceTarget = Boolean(selectedSquare) && isLegalTarget && !draggedSquare;
     const isOwnedPiece = Boolean(piece && piece.color === ownedColor);
 
     const handleClick = () => {
@@ -309,10 +357,13 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
       }
 
       setDragPointer({ x: event.clientX, y: event.clientY });
+      dragStartPointerRef.current = { x: event.clientX, y: event.clientY };
       suppressClickRef.current = true;
       dropHandledRef.current = false;
       draggedSquareRef.current = square;
       setDraggedSquare(square);
+      setDraggedPiecePreview(piece);
+      setIsDraggingVisual(false);
       setSelectedSquare(square);
       hoveredDropSquareRef.current = null;
       setHoveredDropSquare(null);
@@ -352,13 +403,15 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
         className={[
           "relative aspect-square",
           isLight ? "bg-neutral-200" : "bg-board-dark",
-          isSelected ? "outline-2 outline-offset-[-2px] outline-app-purple-strong" : "",
-          "cursor-default",
+          isSelected ? "outline-2 -outline-offset-2 outline-app-purple-strong" : "",
+          isPlaceTarget ? "cursor-grab" : "cursor-default",
         ]
           .filter(Boolean)
           .join(" ")}
       >
-        {draggedSquare && isLegalTarget ? <span className="pointer-events-none absolute inset-0 bg-[#8fcea2]/8" /> : null}
+        {draggedSquare && isDraggingVisual && isLegalTarget ? (
+          <span className="pointer-events-none absolute inset-0 bg-[#8fcea2]/8" />
+        ) : null}
         {isHoveredLegalTarget ? (
           <span className="pointer-events-none absolute inset-0 ring-2 ring-inset ring-[#8fcea2]/85" />
         ) : null}
@@ -372,7 +425,8 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
                 "h-full w-full select-none object-contain",
                 canInteract && isOwnedPiece ? "cursor-grab active:cursor-grabbing" : "cursor-default",
                 draggedSquare === square ? "cursor-grabbing" : "",
-                draggedSquare === square ? "opacity-0" : "",
+                draggedSquare === square && isDraggingVisual ? "opacity-0" : "",
+                placedSquare === square ? "piece-place-animate" : "",
               ]
                 .filter(Boolean)
                 .join(" ")}
@@ -420,7 +474,7 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
       >
         <div className="grid h-full w-full grid-cols-8 overflow-hidden rounded-lg border border-white/10">{cells}</div>
       </div>
-      {draggedPiece && dragPointer ? (
+      {draggedPiece && dragPointer && isDraggingVisual ? (
         <div
           className="pointer-events-none fixed z-50 h-[clamp(34px,4vw,56px)] w-[clamp(34px,4vw,56px)] -translate-x-1/2 -translate-y-1/2"
           style={{ left: dragPointer.x, top: dragPointer.y }}

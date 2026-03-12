@@ -106,12 +106,19 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
   const draggedSquareRef = useRef<string | null>(null);
   const hoveredDropSquareRef = useRef<string | null>(null);
   const legalTargetsRef = useRef<Set<string>>(new Set());
+  const optimisticResetTimeoutRef = useRef<number | null>(null);
+  const [optimisticMove, setOptimisticMove] = useState<{ from: string; to: string; piece: BoardPiece } | null>(null);
 
   useEffect(() => {
     setSelectedSquare(null);
     setDraggedSquare(null);
     setHoveredDropSquare(null);
     setDragPointer(null);
+    setOptimisticMove(null);
+    if (optimisticResetTimeoutRef.current !== null) {
+      window.clearTimeout(optimisticResetTimeoutRef.current);
+      optimisticResetTimeoutRef.current = null;
+    }
     suppressClickRef.current = false;
     dropHandledRef.current = false;
   }, [snapshot.fen]);
@@ -132,7 +139,25 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
     };
   }, [draggedSquare]);
 
-  const pieces = useMemo(() => parseBoardPieces(snapshot.fen), [snapshot.fen]);
+  useEffect(() => {
+    return () => {
+      if (optimisticResetTimeoutRef.current !== null) {
+        window.clearTimeout(optimisticResetTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const snapshotPieces = useMemo(() => parseBoardPieces(snapshot.fen), [snapshot.fen]);
+  const pieces = useMemo(() => {
+    if (!optimisticMove) {
+      return snapshotPieces;
+    }
+
+    const projected = { ...snapshotPieces };
+    delete projected[optimisticMove.from];
+    projected[optimisticMove.to] = optimisticMove.piece;
+    return projected;
+  }, [optimisticMove, snapshotPieces]);
   const moveSourceSquare = draggedSquare ?? selectedSquare;
   const legalTargets = useMemo(
     () => deriveLegalTargets(snapshot.fen, moveSourceSquare),
@@ -155,8 +180,20 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
   }, [legalTargets]);
 
   const dispatchMove = (from: string, to: string) => {
-    const selectedPiece = pieces[from];
-    const reachesBackRank = selectedPiece?.type === "p" && (to.endsWith("1") || to.endsWith("8"));
+    const selectedPiece = snapshotPieces[from];
+    if (!selectedPiece) {
+      return;
+    }
+    const reachesBackRank = selectedPiece.type === "p" && (to.endsWith("1") || to.endsWith("8"));
+    const projectedPiece = reachesBackRank ? { ...selectedPiece, type: "q" as const } : selectedPiece;
+    setOptimisticMove({ from, to, piece: projectedPiece });
+    if (optimisticResetTimeoutRef.current !== null) {
+      window.clearTimeout(optimisticResetTimeoutRef.current);
+    }
+    optimisticResetTimeoutRef.current = window.setTimeout(() => {
+      setOptimisticMove(null);
+      optimisticResetTimeoutRef.current = null;
+    }, 1200);
     onMoveIntent({ from, to, promotion: reachesBackRank ? "q" : undefined });
   };
 

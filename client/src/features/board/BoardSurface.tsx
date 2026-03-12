@@ -215,6 +215,30 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
   const draggedPiece = draggedPiecePreview;
   const planningHighlightSet = useMemo(() => new Set(planningHighlights), [planningHighlights]);
 
+  const clearPlanningMarks = () => {
+    setPlanningArrows([]);
+    setPlanningHighlights([]);
+  };
+
+  const resetPlanningInteractionState = () => {
+    setPlanningStartSquare(null);
+    setPlanningHoverSquare(null);
+  };
+
+  const resetMoveInteractionState = () => {
+    setSelectedSquare(null);
+    setDraggedSquare(null);
+    setHoveredDropSquare(null);
+    setDragPointer(null);
+    setDraggedPiecePreview(null);
+    setIsDraggingVisual(false);
+    draggedSquareRef.current = null;
+    hoveredDropSquareRef.current = null;
+    dragStartPointerRef.current = null;
+    suppressClickRef.current = false;
+    dropHandledRef.current = false;
+  };
+
   useEffect(() => {
     draggedSquareRef.current = draggedSquare;
   }, [draggedSquare]);
@@ -364,8 +388,7 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
 
       const dropSquare = getSquareAtPoint(event) ?? planningHoverSquare ?? planningStartSquare;
       if (!dropSquare) {
-        setPlanningStartSquare(null);
-        setPlanningHoverSquare(null);
+        resetPlanningInteractionState();
         return;
       }
 
@@ -383,8 +406,7 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
         });
       }
 
-      setPlanningStartSquare(null);
-      setPlanningHoverSquare(null);
+      resetPlanningInteractionState();
     };
 
     window.addEventListener("mouseup", handlePlanningMouseUp);
@@ -405,6 +427,9 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
     const isPlannedHighlight = planningHighlightSet.has(square);
 
     const handleClick = () => {
+      if (planningStartSquare) {
+        return;
+      }
       if (suppressClickRef.current) {
         return;
       }
@@ -430,6 +455,9 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
 
     const handlePieceMouseDown = (event: React.MouseEvent<HTMLImageElement>) => {
       if (event.button !== 0) {
+        return;
+      }
+      if (planningStartSquare) {
         return;
       }
       if (!canInteract || !isOwnedPiece) {
@@ -468,6 +496,9 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
     };
 
     const handleSquareMouseUp = () => {
+      if (planningStartSquare) {
+        return;
+      }
       if (!draggedSquareRef.current) {
         return;
       }
@@ -479,6 +510,7 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
         return;
       }
       event.preventDefault();
+      resetMoveInteractionState();
       setPlanningStartSquare(square);
       setPlanningHoverSquare(square);
     };
@@ -549,17 +581,27 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
     <section
       data-testid="board-root"
       className="w-full"
-      tabIndex={0}
-      onKeyDown={(event) => {
-        if (event.key === "Escape") {
-          setSelectedSquare(null);
-          setDraggedSquare(null);
-          setHoveredDropSquare(null);
-          suppressClickRef.current = false;
+      onMouseDownCapture={(event) => {
+        if (event.button !== 0) {
+          return;
+        }
+        const target = event.target;
+        const inSquare =
+          target instanceof Element ? Boolean(target.closest("[data-square]")) : false;
+        if (inSquare) {
+          clearPlanningMarks();
+          resetPlanningInteractionState();
         }
       }}
       onContextMenu={(event) => {
         event.preventDefault();
+        const target = event.target;
+        const inSquare =
+          target instanceof Element ? Boolean(target.closest("[data-square]")) : false;
+        if (!inSquare) {
+          resetPlanningInteractionState();
+          clearPlanningMarks();
+        }
       }}
     >
       <div

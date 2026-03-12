@@ -105,26 +105,6 @@ describe("BoardSurface", () => {
     expect(onMoveIntent).not.toHaveBeenCalled();
   });
 
-  it("cancels current selection on Escape", async () => {
-    const onMoveIntent = vi.fn();
-    const user = userEvent.setup();
-
-    const { container } = render(
-      <BoardSurface
-        snapshot={makeSnapshot()}
-        orientation="white"
-        playerColor="white"
-        onMoveIntent={onMoveIntent}
-      />,
-    );
-
-    await user.click(screen.getByRole("button", { name: "e2" }));
-    fireEvent.keyDown(container.querySelector("section")!, { key: "Escape" });
-    await user.click(screen.getByRole("button", { name: "e4" }));
-
-    expect(onMoveIntent).not.toHaveBeenCalled();
-  });
-
   it("toggles planning square highlight on right-click drag start/end on same square", () => {
     render(<BoardSurface snapshot={makeSnapshot()} orientation="white" playerColor="white" onMoveIntent={vi.fn()} />);
 
@@ -138,6 +118,21 @@ describe("BoardSurface", () => {
     fireEvent.mouseUp(square, { button: 2, clientX: 100, clientY: 100 });
 
     expect(screen.getByTestId("board-root").querySelector('[data-plan-highlight="e4"]')).toBeNull();
+  });
+
+  it("clears planning marks when left-clicking any board square", () => {
+    render(<BoardSurface snapshot={makeSnapshot()} orientation="white" playerColor="white" onMoveIntent={vi.fn()} />);
+
+    const from = screen.getByRole("button", { name: "e2" });
+    const to = screen.getByRole("button", { name: "e4" });
+    fireEvent.mouseDown(from, { button: 2, clientX: 100, clientY: 100 });
+    fireEvent.mouseEnter(to);
+    fireEvent.mouseUp(to, { button: 2, clientX: 120, clientY: 120 });
+    expect(screen.getByTestId("board-root").querySelector('[data-plan-arrow="e2-e4"]')).not.toBeNull();
+
+    fireEvent.mouseDown(screen.getByRole("button", { name: "a3" }), { button: 0, clientX: 80, clientY: 80 });
+
+    expect(screen.getByTestId("board-root").querySelector('[data-plan-arrow="e2-e4"]')).toBeNull();
   });
 
   it("does not make board squares draggable", () => {
@@ -169,6 +164,30 @@ describe("BoardSurface", () => {
     fireEvent.mouseUp(to, { button: 2, clientX: 120, clientY: 120 });
 
     expect(screen.getByTestId("board-root").querySelector('[data-plan-arrow="e2-e4"]')).toBeNull();
+  });
+
+  it("resets active move selection when planning starts with right-click", async () => {
+    const onMoveIntent = vi.fn();
+    const user = userEvent.setup();
+
+    render(
+      <BoardSurface
+        snapshot={makeSnapshot()}
+        orientation="white"
+        playerColor="white"
+        onMoveIntent={onMoveIntent}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "e2" }));
+
+    const square = screen.getByRole("button", { name: "e4" });
+    fireEvent.mouseDown(square, { button: 2, clientX: 100, clientY: 100 });
+    fireEvent.mouseUp(square, { button: 2, clientX: 100, clientY: 100 });
+
+    await user.click(screen.getByRole("button", { name: "e4" }));
+
+    expect(onMoveIntent).not.toHaveBeenCalled();
   });
 
   it("shows drag-start visual state after pointer moves past threshold", () => {

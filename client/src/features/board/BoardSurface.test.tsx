@@ -18,6 +18,7 @@ describe("BoardSurface", () => {
           turn: "white",
           moveCount: 0,
           status: "active",
+          drawOfferBy: null,
           lastMove: null,
           result: null,
         }}
@@ -45,6 +46,7 @@ describe("BoardSurface", () => {
           turn: "white",
           moveCount: 0,
           status: "active",
+          drawOfferBy: null,
           lastMove: null,
           result: null,
         }}

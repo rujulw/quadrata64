@@ -126,8 +126,10 @@ function mapServerGameSnapshot(payload: unknown): GameSnapshot | null {
           reason: snapshot.result.reason,
         }
       : null;
+  const drawOfferBy =
+    snapshot.drawOfferBy === null || isPlayerColor(snapshot.drawOfferBy) ? snapshot.drawOfferBy : null;
 
-  return { fen, turn, status, moveCount, lastMove, result };
+  return { fen, turn, status, moveCount, drawOfferBy, lastMove, result };
 }
 
 function mapMoveFeedEntry(payload: unknown, sanNotation?: string | null): MoveFeedEntry | null {
@@ -240,7 +242,13 @@ export function useWsSync(config: SyncConfig): SyncState & SyncActions {
         }
       }
 
-      if (parsed.type === "init_game" || parsed.type === "move_applied" || parsed.type === "game_over") {
+      if (
+        parsed.type === "init_game" ||
+        parsed.type === "move_applied" ||
+        parsed.type === "game_over" ||
+        parsed.type === "draw_offered" ||
+        parsed.type === "draw_declined"
+      ) {
         const mappedGame = mapServerGameSnapshot(parsed.payload);
         if (mappedGame) {
           if (parsed.type === "init_game") {
@@ -395,6 +403,62 @@ export function useWsSync(config: SyncConfig): SyncState & SyncActions {
     [sendIntent],
   );
 
+  const dispatchResignIntent = useCallback(
+    (roomId: string, playerId: string) => {
+      sendIntent({
+        type: "resign",
+        roomId,
+        payload: {
+          roomId,
+          playerId,
+        },
+      });
+    },
+    [sendIntent],
+  );
+
+  const dispatchDrawOfferIntent = useCallback(
+    (roomId: string, playerId: string) => {
+      sendIntent({
+        type: "draw_offer",
+        roomId,
+        payload: {
+          roomId,
+          playerId,
+        },
+      });
+    },
+    [sendIntent],
+  );
+
+  const dispatchDrawAcceptIntent = useCallback(
+    (roomId: string, playerId: string) => {
+      sendIntent({
+        type: "draw_accept",
+        roomId,
+        payload: {
+          roomId,
+          playerId,
+        },
+      });
+    },
+    [sendIntent],
+  );
+
+  const dispatchDrawDeclineIntent = useCallback(
+    (roomId: string, playerId: string) => {
+      sendIntent({
+        type: "draw_decline",
+        roomId,
+        payload: {
+          roomId,
+          playerId,
+        },
+      });
+    },
+    [sendIntent],
+  );
+
   return useMemo(
     () => ({
       ...state,
@@ -403,7 +467,22 @@ export function useWsSync(config: SyncConfig): SyncState & SyncActions {
       sendIntent,
       toggleReadyIntent,
       dispatchMoveIntent,
+      dispatchResignIntent,
+      dispatchDrawOfferIntent,
+      dispatchDrawAcceptIntent,
+      dispatchDrawDeclineIntent,
     }),
-    [state, connect, disconnect, sendIntent, toggleReadyIntent, dispatchMoveIntent],
+    [
+      state,
+      connect,
+      disconnect,
+      sendIntent,
+      toggleReadyIntent,
+      dispatchMoveIntent,
+      dispatchResignIntent,
+      dispatchDrawOfferIntent,
+      dispatchDrawAcceptIntent,
+      dispatchDrawDeclineIntent,
+    ],
   );
 }

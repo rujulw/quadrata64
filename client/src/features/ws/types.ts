@@ -1,7 +1,15 @@
 import type { GameSnapshot, MoveFeedEntry, MoveIntent } from "../board/types";
 import type { RoomSnapshot } from "../room/types";
 
-export type ClientIntentType = "join_room" | "leave_room" | "ready" | "move";
+export type ClientIntentType =
+  | "join_room"
+  | "leave_room"
+  | "ready"
+  | "move"
+  | "resign"
+  | "draw_offer"
+  | "draw_accept"
+  | "draw_decline";
 
 export type ClientIntentEnvelope = {
   type: ClientIntentType;
@@ -30,4 +38,8 @@ export type SyncActions = {
   sendIntent: (intent: ClientIntentEnvelope) => void;
   toggleReadyIntent: (roomId: string, playerId: string, ready: boolean) => void;
   dispatchMoveIntent: (roomId: string, playerId: string, move: MoveIntent) => void;
+  dispatchResignIntent: (roomId: string, playerId: string) => void;
+  dispatchDrawOfferIntent: (roomId: string, playerId: string) => void;
+  dispatchDrawAcceptIntent: (roomId: string, playerId: string) => void;
+  dispatchDrawDeclineIntent: (roomId: string, playerId: string) => void;
 };

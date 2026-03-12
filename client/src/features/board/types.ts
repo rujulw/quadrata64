@@ -23,6 +23,7 @@ export type GameSnapshot = {
   turn: PlayerColor;
   moveCount: number;
   status: GameStatus;
+  drawOfferBy: PlayerColor | null;
   lastMove: MoveIntent | null;
   result: GameResult | null;
 };

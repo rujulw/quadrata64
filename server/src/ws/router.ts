@@ -7,6 +7,8 @@ import {
 } from "../protocol/messages";
 import type {
   BaseMessage,
+  DrawDeclinedPayload,
+  DrawOfferedPayload,
   GameOverPayload,
   InitGamePayload,
   MoveAppliedPayload,
@@ -14,6 +16,7 @@ import type {
 } from "../protocol/types";
 import {
   GAME_ENGINE_ERRORS,
+  type GameEngine,
   type GameEngineErrorCode,
 } from "../game/GameEngine";
 import {
@@ -33,6 +36,8 @@ import {
   validateLeaveRoomPayload,
   validateMovePayload,
   validateReadyPayload,
+  validateDrawActionPayload,
+  validateResignPayload,
 } from "./validators";
 
 interface SocketMembership {
@@ -87,6 +92,18 @@ export function registerWsRouter(
           return;
         case MESSAGE_TYPES.MOVE:
           handleMove(socket, message);
+          return;
+        case MESSAGE_TYPES.RESIGN:
+          handleResign(socket, message);
+          return;
+        case MESSAGE_TYPES.DRAW_OFFER:
+          handleDrawOffer(socket, message);
+          return;
+        case MESSAGE_TYPES.DRAW_ACCEPT:
+          handleDrawAccept(socket, message);
+          return;
+        case MESSAGE_TYPES.DRAW_DECLINE:
+          handleDrawDecline(socket, message);
           return;
         default:
           sendError(
@@ -313,45 +330,8 @@ export function registerWsRouter(
       move: payload.move,
     });
     if (!applyResult.ok) {
-      switch (applyResult.error) {
-        case GAME_ENGINE_ERRORS.NOT_PLAYER_TURN:
-          sendError(
-            socket,
-            ERROR_CODES.WRONG_TURN_PLAYER,
-            applyResult.message,
-            payload.roomId,
-          );
-          return;
-        case GAME_ENGINE_ERRORS.INVALID_MOVE:
-        case GAME_ENGINE_ERRORS.INVALID_MOVE_INPUT:
-          sendError(
-            socket,
-            ERROR_CODES.ILLEGAL_MOVE,
-            applyResult.message,
-            payload.roomId,
-            payload.move,
-          );
-          return;
-        case GAME_ENGINE_ERRORS.PLAYER_NOT_IN_GAME:
-          sendError(
-            socket,
-            ERROR_CODES.SOCKET_NOT_ASSIGNED,
-            applyResult.message,
-            payload.roomId,
-          );
-          return;
-        case GAME_ENGINE_ERRORS.GAME_NOT_ACTIVE:
-          sendError(
-            socket,
-            ERROR_CODES.GAME_ALREADY_FINISHED,
-            "Game has already finished",
-            payload.roomId,
-          );
-          return;
-        default:
-          sendError(socket, applyResult.error, applyResult.message, payload.roomId);
-          return;
-      }
+      sendMappedGameEngineError(socket, payload.roomId, applyResult.error, applyResult.message, payload.move);
+      return;
     }
 
     broadcastMoveApplied(
@@ -368,6 +348,178 @@ export function registerWsRouter(
         applyResult.data.result,
         applyResult.data.snapshot,
       );
+    }
+  }
+
+  function handleResign(socket: WebSocket, message: IncomingMessage): void {
+    const payloadResult = validateResignPayload(message);
+    if (!payloadResult.ok) {
+      sendError(socket, ERROR_CODES.INVALID_PAYLOAD, payloadResult.message);
+      return;
+    }
+
+    const payload = payloadResult.payload;
+    const game = requireMemberActiveGame(socket, payload);
+    if (!game.ok) {
+      return;
+    }
+
+    const resignResult = game.data.resign(payload.playerId);
+    if (!resignResult.ok) {
+      sendMappedGameEngineError(socket, payload.roomId, resignResult.error, resignResult.message);
+      return;
+    }
+
+    broadcastGameOver(
+      payload.roomId,
+      resignResult.data.snapshot.gameId,
+      resignResult.data.result,
+      resignResult.data.snapshot,
+    );
+  }
+
+  function handleDrawOffer(socket: WebSocket, message: IncomingMessage): void {
+    const payloadResult = validateDrawActionPayload(message);
+    if (!payloadResult.ok) {
+      sendError(socket, ERROR_CODES.INVALID_PAYLOAD, payloadResult.message);
+      return;
+    }
+    const payload = payloadResult.payload;
+    const game = requireMemberActiveGame(socket, payload);
+    if (!game.ok) {
+      return;
+    }
+
+    const offerResult = game.data.offerDraw(payload.playerId);
+    if (!offerResult.ok) {
+      sendMappedGameEngineError(socket, payload.roomId, offerResult.error, offerResult.message);
+      return;
+    }
+
+    broadcastDrawOffered(payload.roomId, payload.playerId, offerResult.data.snapshot);
+  }
+
+  function handleDrawAccept(socket: WebSocket, message: IncomingMessage): void {
+    const payloadResult = validateDrawActionPayload(message);
+    if (!payloadResult.ok) {
+      sendError(socket, ERROR_CODES.INVALID_PAYLOAD, payloadResult.message);
+      return;
+    }
+    const payload = payloadResult.payload;
+    const game = requireMemberActiveGame(socket, payload);
+    if (!game.ok) {
+      return;
+    }
+
+    const acceptResult = game.data.acceptDraw(payload.playerId);
+    if (!acceptResult.ok) {
+      sendMappedGameEngineError(socket, payload.roomId, acceptResult.error, acceptResult.message);
+      return;
+    }
+
+    broadcastGameOver(
+      payload.roomId,
+      acceptResult.data.snapshot.gameId,
+      acceptResult.data.result,
+      acceptResult.data.snapshot,
+    );
+  }
+
+  function handleDrawDecline(socket: WebSocket, message: IncomingMessage): void {
+    const payloadResult = validateDrawActionPayload(message);
+    if (!payloadResult.ok) {
+      sendError(socket, ERROR_CODES.INVALID_PAYLOAD, payloadResult.message);
+      return;
+    }
+    const payload = payloadResult.payload;
+    const game = requireMemberActiveGame(socket, payload);
+    if (!game.ok) {
+      return;
+    }
+
+    const declineResult = game.data.declineDraw(payload.playerId);
+    if (!declineResult.ok) {
+      sendMappedGameEngineError(socket, payload.roomId, declineResult.error, declineResult.message);
+      return;
+    }
+
+    broadcastDrawDeclined(payload.roomId, payload.playerId, declineResult.data.snapshot);
+  }
+
+  function requireMemberActiveGame(
+    socket: WebSocket,
+    payload: { roomId: SessionId; playerId: PlayerId },
+  ): { ok: true; data: GameEngine } | { ok: false } {
+    const membership = socketMembershipBySocket.get(socket);
+    if (
+      !membership ||
+      membership.roomId !== payload.roomId ||
+      membership.playerId !== payload.playerId
+    ) {
+      sendError(
+        socket,
+        ERROR_CODES.SOCKET_NOT_ASSIGNED,
+        "Request requires socket membership in the target room",
+        payload.roomId,
+      );
+      return { ok: false };
+    }
+
+    const activeResult = roomManager.canAcceptMoves(payload.roomId);
+    if (!activeResult.ok) {
+      sendError(socket, activeResult.error, activeResult.message, payload.roomId);
+      return { ok: false };
+    }
+
+    const gameResult = gameManager.requireGame(payload.roomId);
+    if (!gameResult.ok) {
+      sendError(
+        socket,
+        ERROR_CODES.GAME_NOT_FOUND,
+        gameResult.message,
+        payload.roomId,
+      );
+      return { ok: false };
+    }
+
+    return { ok: true, data: gameResult.data };
+  }
+
+  function sendMappedGameEngineError(
+    socket: WebSocket,
+    roomId: SessionId,
+    engineError: GameEngineErrorCode,
+    message: string,
+    move?: MoveIntentPayload["move"],
+  ): void {
+    switch (engineError) {
+      case GAME_ENGINE_ERRORS.NOT_PLAYER_TURN:
+        sendError(socket, ERROR_CODES.WRONG_TURN_PLAYER, message, roomId);
+        return;
+      case GAME_ENGINE_ERRORS.INVALID_MOVE:
+      case GAME_ENGINE_ERRORS.INVALID_MOVE_INPUT:
+        sendError(socket, ERROR_CODES.ILLEGAL_MOVE, message, roomId, move);
+        return;
+      case GAME_ENGINE_ERRORS.PLAYER_NOT_IN_GAME:
+        sendError(socket, ERROR_CODES.SOCKET_NOT_ASSIGNED, message, roomId);
+        return;
+      case GAME_ENGINE_ERRORS.GAME_NOT_ACTIVE:
+        sendError(socket, ERROR_CODES.GAME_ALREADY_FINISHED, "Game has already finished", roomId);
+        return;
+      case GAME_ENGINE_ERRORS.DRAW_ALREADY_OFFERED:
+        sendError(socket, ERROR_CODES.DRAW_ALREADY_OFFERED, message, roomId);
+        return;
+      case GAME_ENGINE_ERRORS.DRAW_NOT_OFFERED:
+        sendError(socket, ERROR_CODES.DRAW_NOT_OFFERED, message, roomId);
+        return;
+      case GAME_ENGINE_ERRORS.DRAW_CANNOT_ACCEPT_OWN_OFFER:
+        sendError(socket, ERROR_CODES.DRAW_CANNOT_ACCEPT_OWN_OFFER, message, roomId);
+        return;
+      case GAME_ENGINE_ERRORS.DRAW_CANNOT_DECLINE_OWN_OFFER:
+        sendError(socket, ERROR_CODES.DRAW_CANNOT_DECLINE_OWN_OFFER, message, roomId);
+        return;
+      default:
+        sendError(socket, engineError, message, roomId);
     }
   }
 
@@ -583,6 +735,56 @@ export function registerWsRouter(
     for (const roomSocket of roomSockets) {
       send(roomSocket, {
         type: MESSAGE_TYPES.GAME_OVER,
+        roomId,
+        payload,
+      });
+    }
+  }
+
+  function broadcastDrawOffered(
+    roomId: SessionId,
+    by: PlayerId,
+    snapshot: InitGamePayload["snapshot"],
+  ): void {
+    const roomSockets = socketsByRoom.get(roomId);
+    if (!roomSockets || roomSockets.size === 0) {
+      return;
+    }
+
+    const payload: DrawOfferedPayload = {
+      roomId,
+      gameId: snapshot.gameId,
+      by,
+      snapshot,
+    };
+    for (const roomSocket of roomSockets) {
+      send(roomSocket, {
+        type: MESSAGE_TYPES.DRAW_OFFERED,
+        roomId,
+        payload,
+      });
+    }
+  }
+
+  function broadcastDrawDeclined(
+    roomId: SessionId,
+    by: PlayerId,
+    snapshot: InitGamePayload["snapshot"],
+  ): void {
+    const roomSockets = socketsByRoom.get(roomId);
+    if (!roomSockets || roomSockets.size === 0) {
+      return;
+    }
+
+    const payload: DrawDeclinedPayload = {
+      roomId,
+      gameId: snapshot.gameId,
+      by,
+      snapshot,
+    };
+    for (const roomSocket of roomSockets) {
+      send(roomSocket, {
+        type: MESSAGE_TYPES.DRAW_DECLINED,
         roomId,
         payload,
       });

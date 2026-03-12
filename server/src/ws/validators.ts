@@ -1,10 +1,12 @@
 import { ERROR_CODES, type ErrorCode } from "../protocol/messages";
 import type {
   BaseMessage,
+  DrawActionPayload,
   JoinRoomPayload,
   LeaveRoomPayload,
   MoveIntentPayload,
   ReadyPayload,
+  ResignPayload,
 } from "../protocol/types";
 
 export type IncomingMessage = BaseMessage<unknown>;
@@ -165,6 +167,25 @@ export function validateMovePayload(
   };
 }
 
+export function validateResignPayload(
+  message: IncomingMessage,
+): { ok: true; payload: ResignPayload } | { ok: false; message: string } {
+  return validateRoomPlayerPayload(message, "resign");
+}
+
+export function validateDrawActionPayload(
+  message: IncomingMessage,
+): { ok: true; payload: DrawActionPayload } | { ok: false; message: string } {
+  switch (message.type) {
+    case "draw_offer":
+    case "draw_accept":
+    case "draw_decline":
+      return validateRoomPlayerPayload(message, message.type);
+    default:
+      return validateRoomPlayerPayload(message, "draw");
+  }
+}
+
 function isMessageEnvelope(value: unknown): value is IncomingMessage {
   if (!isRecord(value)) {
     return false;
@@ -204,6 +225,35 @@ function isMoveInput(value: unknown): value is MoveIntentPayload["move"] {
   }
 
   return true;
+}
+
+function validateRoomPlayerPayload(
+  message: IncomingMessage,
+  actionName: string,
+): { ok: true; payload: { roomId: string; playerId: string } } | { ok: false; message: string } {
+  if (!isRecord(message.payload)) {
+    return { ok: false, message: `${actionName} requires an object payload` };
+  }
+
+  const roomId = message.payload.roomId;
+  const playerId = message.payload.playerId;
+  if (typeof roomId !== "string" || roomId.length === 0) {
+    return { ok: false, message: `${actionName} payload.roomId must be a non-empty string` };
+  }
+  if (typeof playerId !== "string" || playerId.length === 0) {
+    return { ok: false, message: `${actionName} payload.playerId must be a non-empty string` };
+  }
+  if (message.roomId && message.roomId !== roomId) {
+    return { ok: false, message: `${actionName} roomId and payload.roomId must match` };
+  }
+
+  return {
+    ok: true,
+    payload: {
+      roomId,
+      playerId,
+    },
+  };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

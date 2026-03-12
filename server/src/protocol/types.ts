@@ -31,6 +31,16 @@ export interface ReadyPayload {
   ready: boolean;
 }
 
+export interface ResignPayload {
+  roomId: SessionId;
+  playerId: PlayerId;
+}
+
+export interface DrawActionPayload {
+  roomId: SessionId;
+  playerId: PlayerId;
+}
+
 export interface InitGamePayload {
   roomId: SessionId;
   gameId: GameId;
@@ -59,6 +69,20 @@ export interface GameOverPayload {
   snapshot: GameSnapshot;
 }
 
+export interface DrawOfferedPayload {
+  roomId: SessionId;
+  gameId: GameId;
+  by: PlayerId;
+  snapshot: GameSnapshot;
+}
+
+export interface DrawDeclinedPayload {
+  roomId: SessionId;
+  gameId: GameId;
+  by: PlayerId;
+  snapshot: GameSnapshot;
+}
+
 export interface RoomStatePayload {
   roomId: SessionId;
   room: RoomContract | null;
@@ -81,6 +105,22 @@ export interface MoveMessage extends BaseMessage<MoveIntentPayload, "move"> {
   roomId: SessionId;
 }
 
+export interface ResignMessage extends BaseMessage<ResignPayload, "resign"> {
+  roomId: SessionId;
+}
+
+export interface DrawOfferMessage extends BaseMessage<DrawActionPayload, "draw_offer"> {
+  roomId: SessionId;
+}
+
+export interface DrawAcceptMessage extends BaseMessage<DrawActionPayload, "draw_accept"> {
+  roomId: SessionId;
+}
+
+export interface DrawDeclineMessage extends BaseMessage<DrawActionPayload, "draw_decline"> {
+  roomId: SessionId;
+}
+
 export interface InitGameMessage extends BaseMessage<InitGamePayload, "init_game"> {
   roomId: SessionId;
 }
@@ -91,6 +131,14 @@ export interface MoveAppliedMessage
 }
 
 export interface GameOverMessage extends BaseMessage<GameOverPayload, "game_over"> {
+  roomId: SessionId;
+}
+
+export interface DrawOfferedMessage extends BaseMessage<DrawOfferedPayload, "draw_offered"> {
+  roomId: SessionId;
+}
+
+export interface DrawDeclinedMessage extends BaseMessage<DrawDeclinedPayload, "draw_declined"> {
   roomId: SessionId;
 }
 

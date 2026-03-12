@@ -99,6 +99,7 @@ describe("useWsSync", () => {
               turn: "white",
               status: "active",
               moveCount: 0,
+              drawOfferBy: null,
               lastMove: null,
               result: null,
             },
@@ -122,6 +123,7 @@ describe("useWsSync", () => {
           turn: "black",
           status: "active",
           moveCount: 1,
+          drawOfferBy: null,
           lastMove: { from: "e2", to: "e4" },
           result: null,
         },
@@ -159,6 +161,7 @@ describe("useWsSync", () => {
               turn: "white",
               status: "finished",
               moveCount: 4,
+              drawOfferBy: null,
               lastMove: { from: "d8", to: "h4" },
               result: { winnerColor: "black", reason: "checkmate" },
             },
@@ -176,5 +179,142 @@ describe("useWsSync", () => {
       expect(result.current.game?.lastMove).toEqual({ from: "d8", to: "h4", promotion: undefined });
     });
   });
-});
 
+  it("maps draw offer status events into game snapshot", async () => {
+    const { result } = renderHook(() => useWsSync({ roomId: "room-1", playerId: "player-1" }));
+    act(() => {
+      result.current.connect();
+    });
+    const socket = MockWebSocket.instances[0];
+
+    act(() => {
+      socket.emit("open");
+      socket.emit("message", {
+        data: JSON.stringify({
+          type: "draw_offered",
+          payload: {
+            snapshot: {
+              fen: AFTER_E4_FEN,
+              turn: "black",
+              status: "active",
+              moveCount: 1,
+              drawOfferBy: "white",
+              lastMove: { from: "e2", to: "e4" },
+              result: null,
+            },
+          },
+        }),
+      });
+    });
+
+    await waitFor(() => {
+      expect(result.current.game?.drawOfferBy).toBe("white");
+    });
+  });
+
+  it("clears draw offer after draw_declined event", async () => {
+    const { result } = renderHook(() => useWsSync({ roomId: "room-1", playerId: "player-1" }));
+    act(() => {
+      result.current.connect();
+    });
+    const socket = MockWebSocket.instances[0];
+
+    act(() => {
+      socket.emit("open");
+      socket.emit("message", {
+        data: JSON.stringify({
+          type: "draw_offered",
+          payload: {
+            snapshot: {
+              fen: AFTER_E4_FEN,
+              turn: "black",
+              status: "active",
+              moveCount: 1,
+              drawOfferBy: "white",
+              lastMove: { from: "e2", to: "e4" },
+              result: null,
+            },
+          },
+        }),
+      });
+      socket.emit("message", {
+        data: JSON.stringify({
+          type: "draw_declined",
+          payload: {
+            snapshot: {
+              fen: AFTER_E4_FEN,
+              turn: "black",
+              status: "active",
+              moveCount: 1,
+              drawOfferBy: null,
+              lastMove: { from: "e2", to: "e4" },
+              result: null,
+            },
+          },
+        }),
+      });
+    });
+
+    await waitFor(() => {
+      expect(result.current.game?.drawOfferBy).toBe(null);
+      expect(result.current.game?.status).toBe("active");
+    });
+  });
+
+  it("maps draw result from game_over payload", async () => {
+    const { result } = renderHook(() => useWsSync({ roomId: "room-1", playerId: "player-1" }));
+    act(() => {
+      result.current.connect();
+    });
+    const socket = MockWebSocket.instances[0];
+
+    act(() => {
+      socket.emit("open");
+      socket.emit("message", {
+        data: JSON.stringify({
+          type: "game_over",
+          payload: {
+            snapshot: {
+              fen: AFTER_E4_FEN,
+              turn: "black",
+              status: "finished",
+              moveCount: 8,
+              drawOfferBy: null,
+              lastMove: { from: "d8", to: "h4" },
+              result: { winnerColor: null, reason: "draw" },
+            },
+          },
+        }),
+      });
+    });
+
+    await waitFor(() => {
+      expect(result.current.game?.status).toBe("finished");
+      expect(result.current.game?.result).toEqual({ winnerColor: null, reason: "draw" });
+    });
+  });
+
+  it("dispatches resign and draw intents", async () => {
+    const { result } = renderHook(() => useWsSync({ roomId: "room-1", playerId: "player-1" }));
+    act(() => {
+      result.current.connect();
+    });
+    const socket = MockWebSocket.instances[0];
+    act(() => {
+      socket.emit("open");
+    });
+
+    act(() => {
+      result.current.dispatchResignIntent("room-1", "player-1");
+      result.current.dispatchDrawOfferIntent("room-1", "player-1");
+      result.current.dispatchDrawAcceptIntent("room-1", "player-1");
+      result.current.dispatchDrawDeclineIntent("room-1", "player-1");
+    });
+
+    const sentTypes = socket.sentMessages.map((payload) => JSON.parse(payload).type);
+    expect(sentTypes).toContain("resign");
+    expect(sentTypes).toContain("draw_offer");
+    expect(sentTypes).toContain("draw_accept");
+    expect(sentTypes).toContain("draw_decline");
+  });
+});

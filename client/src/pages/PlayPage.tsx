@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { DottedMap } from "../components/ui/dotted-map";
 import { BoardSurface, type GameSnapshot } from "../features/board";
@@ -22,6 +22,8 @@ const DEFAULT_GAME: GameSnapshot = {
   lastMove: null,
   result: null,
 };
+
+const MATCH_WARMUP_MS = 1400;
 
 function formatResultLabel(game: GameSnapshot): string | null {
   if (game.status !== "finished" || !game.result) {
@@ -47,6 +49,8 @@ function getTabPlayerId(): string {
 
 export default function PlayPage() {
   const [playerId] = useState<string>(getTabPlayerId);
+  const [isMatchWarmup, setIsMatchWarmup] = useState(false);
+  const warmupTimeoutRef = useRef<number | null>(null);
   const roomId = DEFAULT_ROOM.roomId;
 
   const {
@@ -90,13 +94,65 @@ export default function PlayPage() {
 
   const isReady = Boolean(currentSeat?.isReady);
   const canReady = Boolean(currentSeat);
-  const isMatching = isReady && room.phase === "waiting";
+  const isMatching = (isReady && room.phase === "waiting") || isMatchWarmup;
   const terminalResultLabel = formatResultLabel(game);
   const canGameActions = Boolean(currentSeat) && room.phase === "active" && game.status === "active";
   const canOfferDraw = canGameActions && !game.drawOfferBy;
   const canRespondToDraw =
     canGameActions && Boolean(game.drawOfferBy) && game.drawOfferBy !== currentPlayerColor;
   const drawOfferLabel = game.drawOfferBy ? `${game.drawOfferBy} offered draw` : null;
+
+  useEffect(() => {
+    return () => {
+      if (warmupTimeoutRef.current !== null) {
+        window.clearTimeout(warmupTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if ((isReady && room.phase === "waiting") || room.phase === "active") {
+      if (warmupTimeoutRef.current !== null) {
+        window.clearTimeout(warmupTimeoutRef.current);
+        warmupTimeoutRef.current = null;
+      }
+      setIsMatchWarmup(false);
+    }
+  }, [isReady, room.phase]);
+
+  const handleToggleReady = () => {
+    if (!canReady) {
+      return;
+    }
+
+    if (isReady) {
+      if (warmupTimeoutRef.current !== null) {
+        window.clearTimeout(warmupTimeoutRef.current);
+        warmupTimeoutRef.current = null;
+      }
+      setIsMatchWarmup(false);
+      toggleReadyIntent(room.roomId, playerId, false);
+      return;
+    }
+
+    if (isMatchWarmup) {
+      if (warmupTimeoutRef.current !== null) {
+        window.clearTimeout(warmupTimeoutRef.current);
+        warmupTimeoutRef.current = null;
+      } else {
+        // Warmup finished and ready intent already sent; allow user to cancel queue immediately.
+        toggleReadyIntent(room.roomId, playerId, false);
+      }
+      setIsMatchWarmup(false);
+      return;
+    }
+
+    setIsMatchWarmup(true);
+    warmupTimeoutRef.current = window.setTimeout(() => {
+      toggleReadyIntent(room.roomId, playerId, true);
+      warmupTimeoutRef.current = null;
+    }, MATCH_WARMUP_MS);
+  };
 
   return (
     <section className="relative min-h-screen overflow-hidden">
@@ -107,8 +163,8 @@ export default function PlayPage() {
       />
 
       <div className="relative mx-auto w-full max-w-365 px-6 py-6 sm:px-8 lg:px-12">
-        <div className="grid min-h-[78vh] gap-4 lg:grid-cols-[minmax(320px,40%)_minmax(0,60%)] lg:items-stretch lg:gap-4">
-          <div className="lg:h-full">
+        <div className="grid min-h-[78vh] gap-4 lg:h-[calc(100vh-165px)] lg:grid-cols-[minmax(320px,40%)_minmax(0,60%)] lg:items-stretch lg:gap-4">
+          <div className="h-full">
             <WaitingRoomPanel
               isMatching={isMatching}
               isReady={isReady}
@@ -123,7 +179,7 @@ export default function PlayPage() {
               canOfferDraw={canOfferDraw}
               canAcceptDraw={canRespondToDraw}
               canDeclineDraw={canRespondToDraw}
-              onToggleReady={() => toggleReadyIntent(room.roomId, playerId, !isReady)}
+              onToggleReady={handleToggleReady}
               onResign={() => dispatchResignIntent(room.roomId, playerId)}
               onOfferDraw={() => dispatchDrawOfferIntent(room.roomId, playerId)}
               onAcceptDraw={() => dispatchDrawAcceptIntent(room.roomId, playerId)}
@@ -131,7 +187,7 @@ export default function PlayPage() {
             />
           </div>
 
-          <div className="flex w-full items-start justify-center">
+          <div className="flex h-full w-full items-start justify-center">
             <BoardSurface
               snapshot={game}
               orientation={orientation}

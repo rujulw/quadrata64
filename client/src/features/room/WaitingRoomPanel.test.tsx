@@ -88,7 +88,8 @@ describe("WaitingRoomPanel", () => {
       />,
     );
 
-    expect(screen.getByText("matching...")).toBeInTheDocument();
+    expect(screen.getByLabelText("finding match")).toBeInTheDocument();
+    expect(screen.getByLabelText("loading")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "queued" })).toBeEnabled();
   });
 

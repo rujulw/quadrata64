@@ -1,8 +1,8 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Flag, Handshake } from "lucide-react";
 
 import { Component as FluidDropdown } from "../../components/ui/fluid-dropdown";
-import { LoaderOne } from "../../components/ui/loader";
+import { LoaderOne, MatchFoundBurst, MatchWaveText } from "../../components/ui/loader";
 import type { MoveFeedEntry, PlayerColor } from "../board";
 
 type WaitingRoomPanelProps = {
@@ -32,8 +32,12 @@ const TIME_CONTROL_OPTIONS = [
   { value: "traditional", label: "traditional", icon: "⚡", description: "10 min" },
 ] as const;
 
-function getStatusLabel(gameStatus: "active" | "finished", gameTurn: PlayerColor) {
-  if (gameStatus === "finished") return "Finished";
+function getStatusLabel(
+  gameStatus: "active" | "finished",
+  gameTurn: PlayerColor,
+  terminalResultLabel: string | null,
+) {
+  if (gameStatus === "finished") return terminalResultLabel ?? "game over";
   return `${gameTurn} to move`;
 }
 
@@ -60,7 +64,52 @@ export function WaitingRoomPanel({
   const [timeControl, setTimeControl] = useState<(typeof TIME_CONTROL_OPTIONS)[number]["value"]>(
     "rapid",
   );
-  const showMatchFace = roomPhase === "active";
+  const [isMatchFoundAnimating, setIsMatchFoundAnimating] = useState(false);
+  const [allowFlipToMatchFace, setAllowFlipToMatchFace] = useState(roomPhase === "active");
+  const phaseRef = useRef(roomPhase);
+  const matchFoundTimeoutRef = useRef<number | null>(null);
+  const showMatchFace = roomPhase === "active" && allowFlipToMatchFace;
+
+  useEffect(() => {
+    const previous = phaseRef.current;
+    phaseRef.current = roomPhase;
+
+    if (roomPhase === "waiting") {
+      if (matchFoundTimeoutRef.current !== null) {
+        window.clearTimeout(matchFoundTimeoutRef.current);
+        matchFoundTimeoutRef.current = null;
+      }
+      setIsMatchFoundAnimating(false);
+      setAllowFlipToMatchFace(false);
+      return;
+    }
+
+    if (roomPhase === "active" && previous === "waiting") {
+      setAllowFlipToMatchFace(false);
+      setIsMatchFoundAnimating(true);
+      if (matchFoundTimeoutRef.current !== null) {
+        window.clearTimeout(matchFoundTimeoutRef.current);
+      }
+      matchFoundTimeoutRef.current = window.setTimeout(() => {
+        setIsMatchFoundAnimating(false);
+        setAllowFlipToMatchFace(true);
+        matchFoundTimeoutRef.current = null;
+      }, 950);
+      return;
+    }
+
+    if (roomPhase === "active") {
+      setAllowFlipToMatchFace(true);
+    }
+  }, [roomPhase]);
+
+  useEffect(() => {
+    return () => {
+      if (matchFoundTimeoutRef.current !== null) {
+        window.clearTimeout(matchFoundTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const moveRows = useMemo(() => {
     const sorted = [...moveFeed].sort((a, b) => a.ply - b.ply);
@@ -84,12 +133,12 @@ export function WaitingRoomPanel({
   }, [moveFeed]);
 
   return (
-    <section className="relative w-full overflow-hidden rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] shadow-[0_24px_80px_rgba(0,0,0,0.35)] backdrop-blur-xl lg:min-h-144">
+    <section className="relative h-full w-full overflow-hidden rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] shadow-[0_24px_80px_rgba(0,0,0,0.35)] backdrop-blur-xl">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(168,85,247,0.18),transparent_32%),radial-gradient(circle_at_bottom_right,rgba(255,255,255,0.05),transparent_28%)]" />
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/10" />
 
       <div className="relative flex h-full flex-col p-6">
-        <div className="mb-5 rounded-2xl border border-white/10 bg-black/20 p-4 shadow-inner shadow-black/10">
+        <div className="rounded-2xl border border-white/10 bg-black/20 p-4 shadow-inner shadow-black/10">
           <div>
             <FluidDropdown
               ariaLabel="time control"
@@ -102,7 +151,7 @@ export function WaitingRoomPanel({
           </div>
         </div>
 
-        <div className="mb-6 h-110 perspective-distant">
+        <div className="mt-auto h-92 perspective-distant">
           <div
             className={[
               "relative h-full w-full rounded-2xl border border-white/10 bg-[#111318]/70 transition-transform duration-700 transform-3d",
@@ -115,18 +164,15 @@ export function WaitingRoomPanel({
               aria-hidden={showMatchFace}
               className="absolute inset-0 flex flex-col justify-between p-5 backface-hidden"
             >
-              <div className="space-y-3">
-                <p className="text-xs font-medium tracking-[0.18em] text-white/45 uppercase">queue</p>
-                <p className="text-sm leading-6 text-white/65">
-                  ready up to enter queue. this card flips to live match controls once an opponent is found.
-                </p>
-              </div>
+              <div />
 
               <div className="flex min-h-12 items-center justify-center">
-                {isMatching ? (
-                  <div className="inline-flex items-center gap-3 rounded-full border border-app-purple-soft/20 bg-app-purple-soft/10 px-3 py-1.5 text-sm text-white/80">
+                {isMatchFoundAnimating ? (
+                  <MatchFoundBurst />
+                ) : isMatching ? (
+                  <div className="flex flex-col items-center gap-1.5">
+                    <MatchWaveText text="finding match" />
                     <LoaderOne />
-                    <span>matching...</span>
                   </div>
                 ) : null}
               </div>
@@ -138,7 +184,7 @@ export function WaitingRoomPanel({
                 onClick={onToggleReady}
                 disabled={!canReady}
               >
-                {isMatching ? "queued" : isReady ? "unready" : "ready up"}
+                {isMatching ? "queued" : isReady ? "unready" : "play!"}
               </button>
             </div>
 
@@ -161,19 +207,17 @@ export function WaitingRoomPanel({
                         .filter(Boolean)
                         .join(" ")}
                     />
-                    <span>{getStatusLabel(gameStatus, gameTurn)}</span>
+                    <span>{getStatusLabel(gameStatus, gameTurn, terminalResultLabel)}</span>
                   </div>
                 </div>
 
-                <div className="border-b border-white/10 px-4 py-3">
-                  {terminalResultLabel ? (
-                    <p className="text-sm font-medium text-app-purple-soft/95">{terminalResultLabel}</p>
-                  ) : drawOfferLabel ? (
-                    <p className="text-sm font-medium text-[#b8d7c2]">{drawOfferLabel}</p>
-                  ) : null}
-                </div>
+                {gameStatus !== "finished" && drawOfferLabel ? (
+                  <div className="px-4 py-2">
+                    <p className="text-xs font-medium text-[#b8d7c2]">{drawOfferLabel}</p>
+                  </div>
+                ) : null}
 
-                <div className="max-h-56 flex-1 overflow-y-auto">
+                <div className="min-h-0 flex-1 overflow-y-auto">
                   {moveRows.length === 0 ? (
                     <div className="px-4 py-8 text-center">
                       <p className="text-sm text-white/40">No moves yet</p>
@@ -212,13 +256,13 @@ export function WaitingRoomPanel({
                   )}
                 </div>
 
-                <div className="flex flex-wrap items-center justify-center gap-2 border-t border-white/10 px-4 py-3">
+                <div className="flex flex-wrap items-center justify-center gap-2 border-t border-white/10 px-4 py-2">
                   <button
                     type="button"
                     aria-label="resign"
                     onClick={onResign}
                     disabled={!canResign}
-                    className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-red-300/20 bg-red-300/8 text-red-100 transition hover:bg-red-300/15 disabled:cursor-not-allowed disabled:opacity-45"
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-red-300/20 bg-red-300/8 text-red-100 transition hover:bg-red-300/15 disabled:cursor-not-allowed disabled:opacity-45"
                   >
                     <Flag className="h-4 w-4" />
                   </button>
@@ -230,7 +274,7 @@ export function WaitingRoomPanel({
                         aria-label="accept draw"
                         onClick={onAcceptDraw}
                         disabled={!canAcceptDraw}
-                        className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-emerald-300/20 bg-emerald-300/8 text-emerald-100 transition hover:bg-emerald-300/15 disabled:cursor-not-allowed disabled:opacity-45"
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-emerald-300/20 bg-emerald-300/8 text-emerald-100 transition hover:bg-emerald-300/15 disabled:cursor-not-allowed disabled:opacity-45"
                       >
                         <Handshake className="h-4 w-4" />
                       </button>
@@ -239,7 +283,7 @@ export function WaitingRoomPanel({
                         aria-label="decline draw"
                         onClick={onDeclineDraw}
                         disabled={!canDeclineDraw}
-                        className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-white/15 bg-white/8 text-lg leading-none text-white/85 transition hover:bg-white/14 disabled:cursor-not-allowed disabled:opacity-45"
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-white/15 bg-white/8 text-lg leading-none text-white/85 transition hover:bg-white/14 disabled:cursor-not-allowed disabled:opacity-45"
                       >
                         ×
                       </button>
@@ -250,7 +294,7 @@ export function WaitingRoomPanel({
                       aria-label="offer draw"
                       onClick={onOfferDraw}
                       disabled={!canOfferDraw}
-                      className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-[#b8d7c2]/25 bg-[#b8d7c2]/10 text-[#d8f0df] transition hover:bg-[#b8d7c2]/18 disabled:cursor-not-allowed disabled:opacity-45"
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-[#b8d7c2]/25 bg-[#b8d7c2]/10 text-[#d8f0df] transition hover:bg-[#b8d7c2]/18 disabled:cursor-not-allowed disabled:opacity-45"
                     >
                       <Handshake className="h-4 w-4" />
                     </button>

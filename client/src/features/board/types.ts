@@ -18,10 +18,25 @@ export type GameResult = {
     | "unknown";
 };
 
+export type TimeControl = {
+  id: "bullet" | "rapid" | "traditional";
+  initialMs: number;
+  incrementMs: number;
+};
+
+export type TimerState = {
+  whiteMs: number;
+  blackMs: number;
+  runningFor: PlayerColor | null;
+  updatedAt: number;
+};
+
 export type GameSnapshot = {
   fen: string;
   turn: PlayerColor;
   moveCount: number;
+  timeControl: TimeControl;
+  timer: TimerState;
   status: GameStatus;
   drawOfferBy: PlayerColor | null;
   lastMove: MoveIntent | null;

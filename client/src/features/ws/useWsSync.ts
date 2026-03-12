@@ -19,6 +19,7 @@ type ServerParticipant = {
 type ServerRoomContract = {
   sessionId: string;
   state: "waiting" | "active" | "closed";
+  timeControl?: "bullet" | "rapid" | "traditional";
   seats: {
     white: string | null;
     black: string | null;
@@ -55,6 +56,10 @@ function isPlayerColor(value: unknown): value is "white" | "black" {
   return value === "white" || value === "black";
 }
 
+function isTimeControlId(value: unknown): value is GameSnapshot["timeControl"]["id"] {
+  return value === "bullet" || value === "rapid" || value === "traditional";
+}
+
 function isResultReason(value: unknown): value is NonNullable<GameSnapshot["result"]>["reason"] {
   return (
     value === "checkmate" ||
@@ -76,6 +81,7 @@ function mapServerRoomToSnapshot(room: ServerRoomContract): RoomSnapshot {
   return {
     roomId: room.sessionId,
     phase: room.state === "active" ? "active" : "waiting",
+    timeControl: room.timeControl ?? "rapid",
     white: room.seats.white
       ? {
           peerId: room.seats.white,
@@ -129,7 +135,53 @@ function mapServerGameSnapshot(payload: unknown): GameSnapshot | null {
   const drawOfferBy =
     snapshot.drawOfferBy === null || isPlayerColor(snapshot.drawOfferBy) ? snapshot.drawOfferBy : null;
 
-  return { fen, turn, status, moveCount, drawOfferBy, lastMove, result };
+  const timeControl: GameSnapshot["timeControl"] =
+    isRecord(snapshot.timeControl) && isTimeControlId(snapshot.timeControl.id)
+      ? {
+          id: snapshot.timeControl.id,
+          initialMs:
+            typeof snapshot.timeControl.initialMs === "number" &&
+            Number.isFinite(snapshot.timeControl.initialMs)
+              ? snapshot.timeControl.initialMs
+              : 180_000,
+          incrementMs:
+            typeof snapshot.timeControl.incrementMs === "number" &&
+            Number.isFinite(snapshot.timeControl.incrementMs)
+              ? snapshot.timeControl.incrementMs
+              : 0,
+        }
+      : {
+          id: "rapid" as const,
+          initialMs: 180_000,
+          incrementMs: 0,
+        };
+
+  const timer: GameSnapshot["timer"] =
+    isRecord(snapshot.timer) &&
+    (snapshot.timer.runningFor === null || isPlayerColor(snapshot.timer.runningFor))
+      ? {
+          whiteMs:
+            typeof snapshot.timer.whiteMs === "number" && Number.isFinite(snapshot.timer.whiteMs)
+              ? snapshot.timer.whiteMs
+              : timeControl.initialMs,
+          blackMs:
+            typeof snapshot.timer.blackMs === "number" && Number.isFinite(snapshot.timer.blackMs)
+              ? snapshot.timer.blackMs
+              : timeControl.initialMs,
+          runningFor: snapshot.timer.runningFor === null ? null : snapshot.timer.runningFor,
+          updatedAt:
+            typeof snapshot.timer.updatedAt === "number" && Number.isFinite(snapshot.timer.updatedAt)
+              ? snapshot.timer.updatedAt
+              : Date.now(),
+        }
+      : {
+          whiteMs: timeControl.initialMs,
+          blackMs: timeControl.initialMs,
+          runningFor: turn,
+          updatedAt: Date.now(),
+        };
+
+  return { fen, turn, status, moveCount, timeControl, timer, drawOfferBy, lastMove, result };
 }
 
 function mapMoveFeedEntry(payload: unknown, sanNotation?: string | null): MoveFeedEntry | null {
@@ -374,7 +426,12 @@ export function useWsSync(config: SyncConfig): SyncState & SyncActions {
   }, [config.playerId, config.roomId]);
 
   const toggleReadyIntent = useCallback(
-    (roomId: string, playerId: string, ready: boolean) => {
+    (
+      roomId: string,
+      playerId: string,
+      ready: boolean,
+      timeControl?: "bullet" | "rapid" | "traditional",
+    ) => {
       sendIntent({
         type: "ready",
         roomId,
@@ -382,6 +439,7 @@ export function useWsSync(config: SyncConfig): SyncState & SyncActions {
           roomId,
           playerId,
           ready,
+          ...(timeControl ? { timeControl } : {}),
         },
       });
     },

@@ -111,6 +111,7 @@ export function validateReadyPayload(
   const roomId = message.payload.roomId;
   const playerId = message.payload.playerId;
   const ready = message.payload.ready;
+  const timeControl = message.payload.timeControl;
   if (typeof roomId !== "string" || roomId.length === 0) {
     return { ok: false, message: "ready payload.roomId must be a non-empty string" };
   }
@@ -120,13 +121,24 @@ export function validateReadyPayload(
   if (typeof ready !== "boolean") {
     return { ok: false, message: "ready payload.ready must be boolean" };
   }
+  if (
+    timeControl !== undefined &&
+    timeControl !== "bullet" &&
+    timeControl !== "rapid" &&
+    timeControl !== "traditional"
+  ) {
+    return {
+      ok: false,
+      message: "ready payload.timeControl must be 'bullet' | 'rapid' | 'traditional'",
+    };
+  }
   if (message.roomId && message.roomId !== roomId) {
     return { ok: false, message: "ready roomId and payload.roomId must match" };
   }
 
   return {
     ok: true,
-    payload: { roomId, playerId, ready },
+    payload: { roomId, playerId, ready, timeControl },
   };
 }
 

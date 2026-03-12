@@ -9,8 +9,15 @@ import {
   type GameResult,
   type GameStatus,
   type GameSnapshot,
+  type TimerState,
+  type TimeControlConfig,
+  type TimeControlId,
 } from "./types";
 import type { PlayerId, SessionId } from "../session/types";
+import {
+  DEFAULT_TIME_CONTROL_ID,
+  getTimeControlConfig,
+} from "./timeControls";
 
 export interface CreateGameInput {
   gameId: GameId;
@@ -19,6 +26,7 @@ export interface CreateGameInput {
     white: PlayerId;
     black: PlayerId;
   };
+  timeControlId?: TimeControlId;
 }
 
 export interface ApplyMoveInput {
@@ -91,6 +99,8 @@ export class GameEngine {
   };
   private readonly chess: Chess;
   private status: GameStatus = GAME_STATUSES.ACTIVE;
+  private readonly timeControl: TimeControlConfig;
+  private timer: TimerState;
   private drawOfferBy: GamePlayerColor | null = null;
   private lastMove: GameMoveInput | null = null;
   private result: GameResult | null = null;
@@ -103,6 +113,13 @@ export class GameEngine {
     this.sessionId = input.sessionId;
     this.players = { ...input.players };
     this.chess = new Chess();
+    this.timeControl = getTimeControlConfig(input.timeControlId ?? DEFAULT_TIME_CONTROL_ID);
+    this.timer = {
+      whiteMs: this.timeControl.initialMs,
+      blackMs: this.timeControl.initialMs,
+      runningFor: GAME_PLAYER_COLORS.WHITE,
+      updatedAt: now,
+    };
     this.createdAt = now;
     this.updatedAt = now;
   }
@@ -115,6 +132,8 @@ export class GameEngine {
       fen: this.chess.fen(),
       turn: this.mapTurn(this.chess.turn()),
       moveCount: this.chess.history().length,
+      timeControl: { ...this.timeControl },
+      timer: { ...this.timer },
       players: { ...this.players },
       drawOfferBy: this.drawOfferBy,
       lastMove: this.lastMove ? { ...this.lastMove } : null,
@@ -154,6 +173,21 @@ export class GameEngine {
       );
     }
 
+    const timedOut = this.consumeActiveTime(Date.now());
+    if (timedOut) {
+      this.status = GAME_STATUSES.FINISHED;
+      this.result = timedOut;
+      this.updatedAt = Date.now();
+      const snapshot = this.snapshot();
+      return this.ok({
+        by: input.playerId,
+        move: { ...input.move },
+        snapshot,
+        gameOver: true,
+        result: snapshot.result,
+      });
+    }
+
     try {
       this.chess.move(input.move);
     } catch (error) {
@@ -163,6 +197,9 @@ export class GameEngine {
 
     this.drawOfferBy = null;
     this.lastMove = { ...input.move };
+    this.applyIncrementFor(playerColor);
+    this.timer.runningFor = this.mapTurn(this.chess.turn());
+    this.timer.updatedAt = Date.now();
     this.updatedAt = Date.now();
 
     if (this.chess.isGameOver()) {
@@ -255,6 +292,8 @@ export class GameEngine {
     this.drawOfferBy = null;
     this.status = GAME_STATUSES.FINISHED;
     this.result = { winnerColor: null, reason: "draw" };
+    this.timer.runningFor = null;
+    this.timer.updatedAt = Date.now();
     this.updatedAt = Date.now();
 
     const snapshot = this.snapshot();
@@ -327,6 +366,8 @@ export class GameEngine {
     this.drawOfferBy = null;
     this.status = GAME_STATUSES.FINISHED;
     this.result = { winnerColor, reason: "resign" };
+    this.timer.runningFor = null;
+    this.timer.updatedAt = Date.now();
     this.updatedAt = Date.now();
 
     const snapshot = this.snapshot();
@@ -370,6 +411,45 @@ export class GameEngine {
     }
 
     return { winnerColor: null, reason: "unknown" };
+  }
+
+  private consumeActiveTime(now: number): GameResult | null {
+    if (this.timer.runningFor === null) {
+      this.timer.updatedAt = now;
+      return null;
+    }
+
+    const elapsedMs = Math.max(0, now - this.timer.updatedAt);
+    if (elapsedMs === 0) {
+      return null;
+    }
+
+    if (this.timer.runningFor === GAME_PLAYER_COLORS.WHITE) {
+      this.timer.whiteMs = Math.max(0, this.timer.whiteMs - elapsedMs);
+      this.timer.updatedAt = now;
+      if (this.timer.whiteMs > 0) return null;
+      this.timer.runningFor = null;
+      return { winnerColor: GAME_PLAYER_COLORS.BLACK, reason: "timeout" };
+    }
+
+    this.timer.blackMs = Math.max(0, this.timer.blackMs - elapsedMs);
+    this.timer.updatedAt = now;
+    if (this.timer.blackMs > 0) return null;
+    this.timer.runningFor = null;
+    return { winnerColor: GAME_PLAYER_COLORS.WHITE, reason: "timeout" };
+  }
+
+  private applyIncrementFor(playerColor: GamePlayerColor): void {
+    if (this.timeControl.incrementMs <= 0) {
+      return;
+    }
+
+    if (playerColor === GAME_PLAYER_COLORS.WHITE) {
+      this.timer.whiteMs += this.timeControl.incrementMs;
+      return;
+    }
+
+    this.timer.blackMs += this.timeControl.incrementMs;
   }
 
   private mapTurn(turn: "w" | "b"): GamePlayerColor {

@@ -6,7 +6,8 @@ import { LoaderOne, MatchFoundBurst, MatchWaveText } from "../../components/ui/l
 import type { MoveFeedEntry, PlayerColor } from "../board";
 
 type WaitingRoomPanelProps = {
-  onToggleReady: () => void;
+  onToggleReady: (timeControl: "bullet" | "rapid" | "traditional") => void;
+  onTimeControlChange: (timeControl: "bullet" | "rapid" | "traditional") => void;
   onResign: () => void;
   onOfferDraw: () => void;
   onAcceptDraw: () => void;
@@ -18,6 +19,7 @@ type WaitingRoomPanelProps = {
   canOfferDraw: boolean;
   canAcceptDraw: boolean;
   canDeclineDraw: boolean;
+  selectedTimeControl: "bullet" | "rapid" | "traditional";
   roomPhase: "waiting" | "active";
   gameTurn: PlayerColor;
   gameStatus: "active" | "finished";
@@ -43,6 +45,7 @@ function getStatusLabel(
 
 export function WaitingRoomPanel({
   onToggleReady,
+  onTimeControlChange,
   onResign,
   onOfferDraw,
   onAcceptDraw,
@@ -54,6 +57,7 @@ export function WaitingRoomPanel({
   canOfferDraw,
   canAcceptDraw,
   canDeclineDraw,
+  selectedTimeControl,
   roomPhase,
   gameTurn,
   gameStatus,
@@ -61,9 +65,6 @@ export function WaitingRoomPanel({
   drawOfferLabel,
   moveFeed,
 }: WaitingRoomPanelProps) {
-  const [timeControl, setTimeControl] = useState<(typeof TIME_CONTROL_OPTIONS)[number]["value"]>(
-    "rapid",
-  );
   const [isMatchFoundAnimating, setIsMatchFoundAnimating] = useState(false);
   const [allowFlipToMatchFace, setAllowFlipToMatchFace] = useState(roomPhase === "active");
   const phaseRef = useRef(roomPhase);
@@ -142,8 +143,8 @@ export function WaitingRoomPanel({
           <div>
             <FluidDropdown
               ariaLabel="time control"
-              value={timeControl}
-              onValueChange={(value) => setTimeControl(value as typeof timeControl)}
+              value={selectedTimeControl}
+              onValueChange={(value) => onTimeControlChange(value as typeof selectedTimeControl)}
               options={TIME_CONTROL_OPTIONS}
               disabled={isMatching || !canReady}
               className="mx-auto w-full max-w-80"
@@ -181,7 +182,7 @@ export function WaitingRoomPanel({
                 type="button"
                 aria-label={isMatching ? "queued" : isReady ? "unready" : "ready up"}
                 className="mx-auto block h-auto! rounded-xl bg-app-purple-strong px-8! py-4! text-4xl! font-bold! leading-none text-white shadow-[0_10px_28px_rgba(124,95,255,0.45)] hover:cursor-pointer disabled:cursor-not-allowed disabled:opacity-55"
-                onClick={onToggleReady}
+                onClick={() => onToggleReady(selectedTimeControl)}
                 disabled={!canReady}
               >
                 {isMatching ? "queued" : isReady ? "unready" : "play!"}

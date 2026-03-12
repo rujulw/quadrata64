@@ -8,6 +8,7 @@ import { useWsSync } from "../features/ws";
 const DEFAULT_ROOM: RoomSnapshot = {
   roomId: "lobby-main",
   phase: "waiting",
+  timeControl: "rapid",
   white: null,
   black: null,
   spectatorCount: 0,
@@ -17,6 +18,17 @@ const DEFAULT_GAME: GameSnapshot = {
   fen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
   turn: "white",
   moveCount: 0,
+  timeControl: {
+    id: "rapid",
+    initialMs: 180_000,
+    incrementMs: 0,
+  },
+  timer: {
+    whiteMs: 180_000,
+    blackMs: 180_000,
+    runningFor: "white",
+    updatedAt: 0,
+  },
   status: "active",
   drawOfferBy: null,
   lastMove: null,
@@ -49,6 +61,9 @@ function getTabPlayerId(): string {
 
 export default function PlayPage() {
   const [playerId] = useState<string>(getTabPlayerId);
+  const [selectedTimeControl, setSelectedTimeControl] = useState<RoomSnapshot["timeControl"]>(
+    DEFAULT_ROOM.timeControl,
+  );
   const [isMatchWarmup, setIsMatchWarmup] = useState(false);
   const warmupTimeoutRef = useRef<number | null>(null);
   const roomId = DEFAULT_ROOM.roomId;
@@ -77,6 +92,10 @@ export default function PlayPage() {
 
   const room = syncedRoom ?? DEFAULT_ROOM;
   const game = syncedGame ?? DEFAULT_GAME;
+
+  useEffect(() => {
+    setSelectedTimeControl(room.timeControl);
+  }, [room.timeControl]);
 
   const currentSeat =
     room.white?.peerId === playerId
@@ -120,7 +139,7 @@ export default function PlayPage() {
     }
   }, [isReady, room.phase]);
 
-  const handleToggleReady = () => {
+  const handleToggleReady = (timeControl: RoomSnapshot["timeControl"]) => {
     if (!canReady) {
       return;
     }
@@ -149,7 +168,7 @@ export default function PlayPage() {
 
     setIsMatchWarmup(true);
     warmupTimeoutRef.current = window.setTimeout(() => {
-      toggleReadyIntent(room.roomId, playerId, true);
+      toggleReadyIntent(room.roomId, playerId, true, timeControl);
       warmupTimeoutRef.current = null;
     }, MATCH_WARMUP_MS);
   };
@@ -179,6 +198,8 @@ export default function PlayPage() {
               canOfferDraw={canOfferDraw}
               canAcceptDraw={canRespondToDraw}
               canDeclineDraw={canRespondToDraw}
+              selectedTimeControl={selectedTimeControl}
+              onTimeControlChange={setSelectedTimeControl}
               onToggleReady={handleToggleReady}
               onResign={() => dispatchResignIntent(room.roomId, playerId)}
               onOfferDraw={() => dispatchDrawOfferIntent(room.roomId, playerId)}

@@ -4,15 +4,21 @@ import { describe, expect, it, vi } from "vitest";
 
 import { WaitingRoomPanel } from "./WaitingRoomPanel";
 
+const baseProps = {
+  onToggleReady: vi.fn(),
+  onTimeControlChange: vi.fn(),
+  onResign: vi.fn(),
+  onOfferDraw: vi.fn(),
+  onAcceptDraw: vi.fn(),
+  onDeclineDraw: vi.fn(),
+  selectedTimeControl: "rapid" as const,
+};
+
 describe("WaitingRoomPanel", () => {
   it("renders ready-up state when player can ready", () => {
     render(
       <WaitingRoomPanel
-        onToggleReady={vi.fn()}
-        onResign={vi.fn()}
-        onOfferDraw={vi.fn()}
-        onAcceptDraw={vi.fn()}
-        onDeclineDraw={vi.fn()}
+        {...baseProps}
         isMatching={false}
         isReady={false}
         canReady
@@ -38,11 +44,8 @@ describe("WaitingRoomPanel", () => {
 
     render(
       <WaitingRoomPanel
+        {...baseProps}
         onToggleReady={onToggleReady}
-        onResign={vi.fn()}
-        onOfferDraw={vi.fn()}
-        onAcceptDraw={vi.fn()}
-        onDeclineDraw={vi.fn()}
         isMatching={false}
         isReady={false}
         canReady
@@ -67,11 +70,7 @@ describe("WaitingRoomPanel", () => {
   it("renders queued loader state while waiting for opponent", () => {
     render(
       <WaitingRoomPanel
-        onToggleReady={vi.fn()}
-        onResign={vi.fn()}
-        onOfferDraw={vi.fn()}
-        onAcceptDraw={vi.fn()}
-        onDeclineDraw={vi.fn()}
+        {...baseProps}
         isMatching
         isReady
         canReady
@@ -96,11 +95,7 @@ describe("WaitingRoomPanel", () => {
   it("renders match face when room is active", () => {
     render(
       <WaitingRoomPanel
-        onToggleReady={vi.fn()}
-        onResign={vi.fn()}
-        onOfferDraw={vi.fn()}
-        onAcceptDraw={vi.fn()}
-        onDeclineDraw={vi.fn()}
+        {...baseProps}
         isMatching={false}
         isReady
         canReady
@@ -125,11 +120,7 @@ describe("WaitingRoomPanel", () => {
   it("disables actions when player has no seat", () => {
     render(
       <WaitingRoomPanel
-        onToggleReady={vi.fn()}
-        onResign={vi.fn()}
-        onOfferDraw={vi.fn()}
-        onAcceptDraw={vi.fn()}
-        onDeclineDraw={vi.fn()}
+        {...baseProps}
         isMatching={false}
         isReady={false}
         canReady={false}
@@ -156,11 +147,8 @@ describe("WaitingRoomPanel", () => {
 
     render(
       <WaitingRoomPanel
-        onToggleReady={vi.fn()}
-        onResign={vi.fn()}
-        onOfferDraw={vi.fn()}
+        {...baseProps}
         onAcceptDraw={onAcceptDraw}
-        onDeclineDraw={vi.fn()}
         isMatching={false}
         isReady
         canReady
@@ -188,11 +176,8 @@ describe("WaitingRoomPanel", () => {
 
     render(
       <WaitingRoomPanel
-        onToggleReady={vi.fn()}
-        onResign={vi.fn()}
+        {...baseProps}
         onOfferDraw={onOfferDraw}
-        onAcceptDraw={vi.fn()}
-        onDeclineDraw={vi.fn()}
         isMatching={false}
         isReady
         canReady
@@ -216,11 +201,7 @@ describe("WaitingRoomPanel", () => {
   it("shows draw response controls instead of offer button when pending offer exists", () => {
     render(
       <WaitingRoomPanel
-        onToggleReady={vi.fn()}
-        onResign={vi.fn()}
-        onOfferDraw={vi.fn()}
-        onAcceptDraw={vi.fn()}
-        onDeclineDraw={vi.fn()}
+        {...baseProps}
         isMatching={false}
         isReady
         canReady

@@ -1,6 +1,7 @@
 import {
   PLAYER_SLOTS,
   ROOM_STATES,
+  type TimeControlId,
   type PlayerId,
   type PlayerSeat,
   type PlayerSlot,
@@ -67,6 +68,7 @@ export interface ReadyInput {
   sessionId: SessionId;
   playerId: PlayerId;
   ready: boolean;
+  timeControl?: TimeControlId;
 }
 
 export interface ReadyOutput {
@@ -96,6 +98,7 @@ export class RoomManager {
     const room: RoomContract = {
       sessionId,
       state: ROOM_STATES.WAITING,
+      timeControl: "rapid",
       seats: {
         white: null,
         black: null,
@@ -247,6 +250,9 @@ export class RoomManager {
     }
 
     participant.ready = input.ready;
+    if (input.timeControl) {
+      room.timeControl = input.timeControl;
+    }
 
     const wasActive = room.state === ROOM_STATES.ACTIVE;
     const shouldActivate = this.canActivateRoom(room);
@@ -289,6 +295,7 @@ export class RoomManager {
       return {
         sessionId,
         state: ROOM_STATES.CLOSED,
+        timeControl: "rapid",
         seats: { white: null, black: null },
         spectators: [],
         participants: [],

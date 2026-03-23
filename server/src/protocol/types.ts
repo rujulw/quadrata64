@@ -29,6 +29,7 @@ export interface ReadyPayload {
   roomId: SessionId;
   playerId: PlayerId;
   ready: boolean;
+  timeControl?: "bullet" | "rapid" | "traditional";
 }
 
 export interface ResignPayload {

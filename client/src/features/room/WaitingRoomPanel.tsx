@@ -6,7 +6,8 @@ import { LoaderOne, MatchFoundBurst, MatchWaveText } from "../../components/ui/l
 import type { MoveFeedEntry, PlayerColor } from "../board";
 
 type WaitingRoomPanelProps = {
-  onToggleReady: () => void;
+  onToggleReady: (timeControl: "bullet" | "rapid" | "traditional") => void;
+  onTimeControlChange: (timeControl: "bullet" | "rapid" | "traditional") => void;
   onResign: () => void;
   onOfferDraw: () => void;
   onAcceptDraw: () => void;
@@ -18,6 +19,11 @@ type WaitingRoomPanelProps = {
   canOfferDraw: boolean;
   canAcceptDraw: boolean;
   canDeclineDraw: boolean;
+  selectedTimeControl: "bullet" | "rapid" | "traditional";
+  whiteClockMs: number;
+  blackClockMs: number;
+  runningClock: PlayerColor | null;
+  timeoutColor: PlayerColor | null;
   roomPhase: "waiting" | "active";
   gameTurn: PlayerColor;
   gameStatus: "active" | "finished";
@@ -36,13 +42,24 @@ function getStatusLabel(
   gameStatus: "active" | "finished",
   gameTurn: PlayerColor,
   terminalResultLabel: string | null,
+  timeoutColor: PlayerColor | null,
 ) {
+  if (timeoutColor) return `${timeoutColor} out of time`;
   if (gameStatus === "finished") return terminalResultLabel ?? "game over";
   return `${gameTurn} to move`;
 }
 
+function formatClock(ms: number): string {
+  const clamped = Math.max(0, Math.floor(ms));
+  const totalSeconds = Math.ceil(clamped / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
 export function WaitingRoomPanel({
   onToggleReady,
+  onTimeControlChange,
   onResign,
   onOfferDraw,
   onAcceptDraw,
@@ -54,6 +71,11 @@ export function WaitingRoomPanel({
   canOfferDraw,
   canAcceptDraw,
   canDeclineDraw,
+  selectedTimeControl,
+  whiteClockMs,
+  blackClockMs,
+  runningClock,
+  timeoutColor,
   roomPhase,
   gameTurn,
   gameStatus,
@@ -61,9 +83,6 @@ export function WaitingRoomPanel({
   drawOfferLabel,
   moveFeed,
 }: WaitingRoomPanelProps) {
-  const [timeControl, setTimeControl] = useState<(typeof TIME_CONTROL_OPTIONS)[number]["value"]>(
-    "rapid",
-  );
   const [isMatchFoundAnimating, setIsMatchFoundAnimating] = useState(false);
   const [allowFlipToMatchFace, setAllowFlipToMatchFace] = useState(roomPhase === "active");
   const phaseRef = useRef(roomPhase);
@@ -138,12 +157,41 @@ export function WaitingRoomPanel({
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/10" />
 
       <div className="relative flex h-full flex-col p-6">
+        <div className="mb-4 grid grid-cols-2 gap-2">
+          <div
+            className={[
+              "rounded-xl border bg-black/25 px-3 py-2.5 text-center transition-colors",
+              runningClock === "white" && !timeoutColor
+                ? "border-white/35 shadow-[0_0_18px_rgba(255,255,255,0.12)]"
+                : "border-white/10",
+              timeoutColor === "white" ? "border-red-300/40 text-red-100" : "text-white/90",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+          >
+            <p className="font-mono text-2xl leading-none tabular-nums">{formatClock(whiteClockMs)}</p>
+          </div>
+          <div
+            className={[
+              "rounded-xl border bg-black/25 px-3 py-2.5 text-center transition-colors",
+              runningClock === "black" && !timeoutColor
+                ? "border-white/35 shadow-[0_0_18px_rgba(255,255,255,0.12)]"
+                : "border-white/10",
+              timeoutColor === "black" ? "border-red-300/40 text-red-100" : "text-white/72",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+          >
+            <p className="font-mono text-2xl leading-none tabular-nums">{formatClock(blackClockMs)}</p>
+          </div>
+        </div>
+
         <div className="rounded-2xl border border-white/10 bg-black/20 p-4 shadow-inner shadow-black/10">
           <div>
             <FluidDropdown
               ariaLabel="time control"
-              value={timeControl}
-              onValueChange={(value) => setTimeControl(value as typeof timeControl)}
+              value={selectedTimeControl}
+              onValueChange={(value) => onTimeControlChange(value as typeof selectedTimeControl)}
               options={TIME_CONTROL_OPTIONS}
               disabled={isMatching || !canReady}
               className="mx-auto w-full max-w-80"
@@ -181,7 +229,7 @@ export function WaitingRoomPanel({
                 type="button"
                 aria-label={isMatching ? "queued" : isReady ? "unready" : "ready up"}
                 className="mx-auto block h-auto! rounded-xl bg-app-purple-strong px-8! py-4! text-4xl! font-bold! leading-none text-white shadow-[0_10px_28px_rgba(124,95,255,0.45)] hover:cursor-pointer disabled:cursor-not-allowed disabled:opacity-55"
-                onClick={onToggleReady}
+                onClick={() => onToggleReady(selectedTimeControl)}
                 disabled={!canReady}
               >
                 {isMatching ? "queued" : isReady ? "unready" : "play!"}
@@ -207,7 +255,7 @@ export function WaitingRoomPanel({
                         .filter(Boolean)
                         .join(" ")}
                     />
-                    <span>{getStatusLabel(gameStatus, gameTurn, terminalResultLabel)}</span>
+                    <span>{getStatusLabel(gameStatus, gameTurn, terminalResultLabel, timeoutColor)}</span>
                   </div>
                 </div>
 

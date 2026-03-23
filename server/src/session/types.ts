@@ -19,6 +19,8 @@ export type PlayerSlot = (typeof PLAYER_SLOTS)[keyof typeof PLAYER_SLOTS];
 
 export type PlayerSeat = Exclude<PlayerSlot, "spectator">;
 
+export type TimeControlId = "bullet" | "rapid" | "traditional";
+
 export interface RoomParticipant {
   playerId: PlayerId;
   slot: PlayerSlot;
@@ -30,6 +32,7 @@ export interface RoomParticipant {
 export interface RoomContract {
   sessionId: SessionId;
   state: RoomState;
+  timeControl: TimeControlId;
   seats: {
     white: PlayerId | null;
     black: PlayerId | null;

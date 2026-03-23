@@ -65,6 +65,7 @@ export class GameManager {
         white: room.seats.white,
         black: room.seats.black,
       },
+      timeControlId: room.timeControl,
     });
     this.gamesBySession.set(room.sessionId, game);
 

@@ -1,5 +1,5 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useWsSync } from "./useWsSync";
 
@@ -316,5 +316,177 @@ describe("useWsSync", () => {
     expect(sentTypes).toContain("draw_offer");
     expect(sentTypes).toContain("draw_accept");
     expect(sentTypes).toContain("draw_decline");
+  });
+
+  it("projects elapsed clock time and flips the running side when turn changes without timer fields", async () => {
+    vi.useFakeTimers();
+
+    try {
+      vi.setSystemTime(1_000);
+      const { result } = renderHook(() => useWsSync({ roomId: "room-1", playerId: "player-1" }));
+
+      act(() => {
+        result.current.connect();
+      });
+      const socket = MockWebSocket.instances[0];
+
+      act(() => {
+        socket.emit("open");
+        socket.emit("message", {
+          data: JSON.stringify({
+            type: "init_game",
+            payload: {
+              snapshot: {
+                fen: START_FEN,
+                turn: "white",
+                status: "active",
+                moveCount: 0,
+                drawOfferBy: null,
+                lastMove: null,
+                result: null,
+                timeControl: {
+                  id: "rapid",
+                  initialMs: 180_000,
+                  incrementMs: 0,
+                },
+                timer: {
+                  whiteMs: 180_000,
+                  blackMs: 180_000,
+                  runningFor: "white",
+                  updatedAt: 1_000,
+                },
+              },
+            },
+          }),
+        });
+      });
+
+      expect(result.current.game?.timer.whiteMs).toBe(180_000);
+
+      vi.setSystemTime(3_500);
+      act(() => {
+        socket.emit("message", {
+          data: JSON.stringify({
+            type: "move_applied",
+            payload: {
+              by: "player-1",
+              move: { from: "e2", to: "e4" },
+              snapshot: {
+                fen: AFTER_E4_FEN,
+                turn: "black",
+                status: "active",
+                moveCount: 1,
+                drawOfferBy: null,
+                lastMove: { from: "e2", to: "e4" },
+                result: null,
+              },
+            },
+          }),
+        });
+      });
+
+      expect(result.current.game?.timer).toEqual({
+        whiteMs: 177_500,
+        blackMs: 180_000,
+        runningFor: "black",
+        updatedAt: 3_500,
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("preserves prior time control and projects clock drift on reconnect init_game payloads", async () => {
+    vi.useFakeTimers();
+
+    try {
+      vi.setSystemTime(1_000);
+      const { result } = renderHook(() => useWsSync({ roomId: "room-1", playerId: "player-1" }));
+
+      act(() => {
+        result.current.connect();
+      });
+      const firstSocket = MockWebSocket.instances[0];
+
+      act(() => {
+        firstSocket.emit("open");
+        firstSocket.emit("message", {
+          data: JSON.stringify({
+            type: "init_game",
+            payload: {
+              snapshot: {
+                fen: START_FEN,
+                turn: "white",
+                status: "active",
+                moveCount: 0,
+                drawOfferBy: null,
+                lastMove: null,
+                result: null,
+                timeControl: {
+                  id: "rapid",
+                  initialMs: 180_000,
+                  incrementMs: 0,
+                },
+                timer: {
+                  whiteMs: 180_000,
+                  blackMs: 180_000,
+                  runningFor: "white",
+                  updatedAt: 1_000,
+                },
+              },
+            },
+          }),
+        });
+      });
+
+      expect(result.current.game?.timeControl.id).toBe("rapid");
+
+      act(() => {
+        result.current.disconnect();
+      });
+
+      act(() => {
+        result.current.connect();
+      });
+      const secondSocket = MockWebSocket.instances[1];
+
+      act(() => {
+        secondSocket.emit("open");
+      });
+
+      vi.setSystemTime(4_000);
+      act(() => {
+        secondSocket.emit("message", {
+          data: JSON.stringify({
+            type: "init_game",
+            payload: {
+              snapshot: {
+                fen: START_FEN,
+                turn: "white",
+                status: "active",
+                moveCount: 0,
+                drawOfferBy: null,
+                lastMove: null,
+                result: null,
+              },
+            },
+          }),
+        });
+      });
+
+      expect(result.current.game?.timeControl).toEqual({
+        id: "rapid",
+        initialMs: 180_000,
+        incrementMs: 0,
+      });
+      expect(result.current.game?.timer).toEqual({
+        whiteMs: 177_000,
+        blackMs: 180_000,
+        runningFor: "white",
+        updatedAt: 4_000,
+      });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

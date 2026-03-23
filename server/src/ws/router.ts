@@ -272,6 +272,7 @@ export function registerWsRouter(
       sessionId: payload.roomId,
       playerId: payload.playerId,
       ready: payload.ready,
+      timeControl: payload.timeControl,
     });
     if (!readyResult.ok) {
       sendError(socket, readyResult.error, readyResult.message, payload.roomId);

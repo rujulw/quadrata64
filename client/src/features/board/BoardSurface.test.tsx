@@ -12,6 +12,17 @@ function makeSnapshot(fen: string = START_FEN) {
     fen,
     turn: "white" as const,
     moveCount: 0,
+    timeControl: {
+      id: "rapid" as const,
+      initialMs: 180_000,
+      incrementMs: 0,
+    },
+    timer: {
+      whiteMs: 180_000,
+      blackMs: 180_000,
+      runningFor: "white" as const,
+      updatedAt: Date.now(),
+    },
     status: "active" as const,
     drawOfferBy: null,
     lastMove: null,

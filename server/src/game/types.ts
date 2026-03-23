@@ -20,6 +20,28 @@ export type GamePlayerColor =
 
 export type PromotionPiece = "q" | "r" | "b" | "n";
 
+export const TIME_CONTROL_IDS = {
+  BULLET: "bullet",
+  RAPID: "rapid",
+  TRADITIONAL: "traditional",
+} as const;
+
+export type TimeControlId =
+  (typeof TIME_CONTROL_IDS)[keyof typeof TIME_CONTROL_IDS];
+
+export interface TimeControlConfig {
+  id: TimeControlId;
+  initialMs: number;
+  incrementMs: number;
+}
+
+export interface TimerState {
+  whiteMs: number;
+  blackMs: number;
+  runningFor: GamePlayerColor | null;
+  updatedAt: number;
+}
+
 export interface GameMoveInput {
   from: string;
   to: string;
@@ -47,6 +69,8 @@ export interface GameSnapshot {
   fen: string;
   turn: GamePlayerColor;
   moveCount: number;
+  timeControl: TimeControlConfig;
+  timer: TimerState;
   players: {
     white: PlayerId;
     black: PlayerId;

@@ -4,15 +4,25 @@ import { describe, expect, it, vi } from "vitest";
 
 import { WaitingRoomPanel } from "./WaitingRoomPanel";
 
+const baseProps = {
+  onToggleReady: vi.fn(),
+  onTimeControlChange: vi.fn(),
+  onResign: vi.fn(),
+  onOfferDraw: vi.fn(),
+  onAcceptDraw: vi.fn(),
+  onDeclineDraw: vi.fn(),
+  selectedTimeControl: "rapid" as const,
+  whiteClockMs: 180_000,
+  blackClockMs: 180_000,
+  runningClock: null,
+  timeoutColor: null,
+};
+
 describe("WaitingRoomPanel", () => {
   it("renders ready-up state when player can ready", () => {
     render(
       <WaitingRoomPanel
-        onToggleReady={vi.fn()}
-        onResign={vi.fn()}
-        onOfferDraw={vi.fn()}
-        onAcceptDraw={vi.fn()}
-        onDeclineDraw={vi.fn()}
+        {...baseProps}
         isMatching={false}
         isReady={false}
         canReady
@@ -38,11 +48,8 @@ describe("WaitingRoomPanel", () => {
 
     render(
       <WaitingRoomPanel
+        {...baseProps}
         onToggleReady={onToggleReady}
-        onResign={vi.fn()}
-        onOfferDraw={vi.fn()}
-        onAcceptDraw={vi.fn()}
-        onDeclineDraw={vi.fn()}
         isMatching={false}
         isReady={false}
         canReady
@@ -67,11 +74,7 @@ describe("WaitingRoomPanel", () => {
   it("renders queued loader state while waiting for opponent", () => {
     render(
       <WaitingRoomPanel
-        onToggleReady={vi.fn()}
-        onResign={vi.fn()}
-        onOfferDraw={vi.fn()}
-        onAcceptDraw={vi.fn()}
-        onDeclineDraw={vi.fn()}
+        {...baseProps}
         isMatching
         isReady
         canReady
@@ -96,11 +99,7 @@ describe("WaitingRoomPanel", () => {
   it("renders match face when room is active", () => {
     render(
       <WaitingRoomPanel
-        onToggleReady={vi.fn()}
-        onResign={vi.fn()}
-        onOfferDraw={vi.fn()}
-        onAcceptDraw={vi.fn()}
-        onDeclineDraw={vi.fn()}
+        {...baseProps}
         isMatching={false}
         isReady
         canReady
@@ -125,11 +124,7 @@ describe("WaitingRoomPanel", () => {
   it("disables actions when player has no seat", () => {
     render(
       <WaitingRoomPanel
-        onToggleReady={vi.fn()}
-        onResign={vi.fn()}
-        onOfferDraw={vi.fn()}
-        onAcceptDraw={vi.fn()}
-        onDeclineDraw={vi.fn()}
+        {...baseProps}
         isMatching={false}
         isReady={false}
         canReady={false}
@@ -156,11 +151,8 @@ describe("WaitingRoomPanel", () => {
 
     render(
       <WaitingRoomPanel
-        onToggleReady={vi.fn()}
-        onResign={vi.fn()}
-        onOfferDraw={vi.fn()}
+        {...baseProps}
         onAcceptDraw={onAcceptDraw}
-        onDeclineDraw={vi.fn()}
         isMatching={false}
         isReady
         canReady
@@ -188,11 +180,8 @@ describe("WaitingRoomPanel", () => {
 
     render(
       <WaitingRoomPanel
-        onToggleReady={vi.fn()}
-        onResign={vi.fn()}
+        {...baseProps}
         onOfferDraw={onOfferDraw}
-        onAcceptDraw={vi.fn()}
-        onDeclineDraw={vi.fn()}
         isMatching={false}
         isReady
         canReady
@@ -216,11 +205,7 @@ describe("WaitingRoomPanel", () => {
   it("shows draw response controls instead of offer button when pending offer exists", () => {
     render(
       <WaitingRoomPanel
-        onToggleReady={vi.fn()}
-        onResign={vi.fn()}
-        onOfferDraw={vi.fn()}
-        onAcceptDraw={vi.fn()}
-        onDeclineDraw={vi.fn()}
+        {...baseProps}
         isMatching={false}
         isReady
         canReady
@@ -240,5 +225,34 @@ describe("WaitingRoomPanel", () => {
     expect(screen.queryByRole("button", { name: "offer draw" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "accept draw" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "decline draw" })).toBeEnabled();
+  });
+
+  it("renders live clocks and timeout status copy", () => {
+    render(
+      <WaitingRoomPanel
+        {...baseProps}
+        whiteClockMs={0}
+        blackClockMs={130_000}
+        runningClock={null}
+        timeoutColor="white"
+        isMatching={false}
+        isReady
+        canReady
+        canResign={false}
+        canOfferDraw={false}
+        canAcceptDraw={false}
+        canDeclineDraw={false}
+        roomPhase="active"
+        gameTurn="black"
+        gameStatus="active"
+        terminalResultLabel={null}
+        drawOfferLabel={null}
+        moveFeed={[]}
+      />,
+    );
+
+    expect(screen.getByText("0:00")).toBeInTheDocument();
+    expect(screen.getByText("2:10")).toBeInTheDocument();
+    expect(screen.getByText("white out of time")).toBeInTheDocument();
   });
 });

@@ -36,7 +36,12 @@ export type SyncActions = {
   connect: () => void;
   disconnect: () => void;
   sendIntent: (intent: ClientIntentEnvelope) => void;
-  toggleReadyIntent: (roomId: string, playerId: string, ready: boolean) => void;
+  toggleReadyIntent: (
+    roomId: string,
+    playerId: string,
+    ready: boolean,
+    timeControl?: "bullet" | "rapid" | "traditional",
+  ) => void;
   dispatchMoveIntent: (roomId: string, playerId: string, move: MoveIntent) => void;
   dispatchResignIntent: (roomId: string, playerId: string) => void;
   dispatchDrawOfferIntent: (roomId: string, playerId: string) => void;

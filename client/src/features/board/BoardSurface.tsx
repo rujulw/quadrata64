@@ -135,6 +135,8 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
   const placeAnimationTimeoutRef = useRef<number | null>(null);
   const dragCleanupFrameRef = useRef<number | null>(null);
   const dragStartPointerRef = useRef<{ x: number; y: number } | null>(null);
+  const activePointerIdRef = useRef<number | null>(null);
+  const activePointerTargetRef = useRef<HTMLElement | null>(null);
   const [optimisticFen, setOptimisticFen] = useState<string | null>(null);
   const [placedSquare, setPlacedSquare] = useState<string | null>(null);
   const [draggedPiecePreview, setDraggedPiecePreview] = useState<BoardPiece | null>(null);
@@ -195,6 +197,7 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
         window.cancelAnimationFrame(dragCleanupFrameRef.current);
       }
       dragStartPointerRef.current = null;
+      releaseActivePointerCapture();
     };
   }, []);
 
@@ -214,6 +217,27 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
   const ownedColor = playerColor === "white" ? "w" : "b";
   const draggedPiece = draggedPiecePreview;
   const planningHighlightSet = useMemo(() => new Set(planningHighlights), [planningHighlights]);
+
+  const releaseActivePointerCapture = () => {
+    const pointerTarget = activePointerTargetRef.current;
+    const pointerId = activePointerIdRef.current;
+    if (!pointerTarget || pointerId === null) {
+      activePointerTargetRef.current = null;
+      activePointerIdRef.current = null;
+      return;
+    }
+
+    if (typeof pointerTarget.releasePointerCapture === "function") {
+      try {
+        pointerTarget.releasePointerCapture(pointerId);
+      } catch {
+        // Ignore cases where capture is already gone.
+      }
+    }
+
+    activePointerTargetRef.current = null;
+    activePointerIdRef.current = null;
+  };
 
   const clearPlanningMarks = () => {
     setPlanningArrows([]);
@@ -235,6 +259,7 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
     draggedSquareRef.current = null;
     hoveredDropSquareRef.current = null;
     dragStartPointerRef.current = null;
+    releaseActivePointerCapture();
     suppressClickRef.current = false;
     dropHandledRef.current = false;
   };
@@ -297,6 +322,7 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
       dragStartPointerRef.current = null;
       draggedSquareRef.current = null;
       hoveredDropSquareRef.current = null;
+      releaseActivePointerCapture();
     };
     if (isValidDrop && typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
       if (dragCleanupFrameRef.current !== null) {
@@ -315,8 +341,15 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
     }, 0);
   };
 
-  const getSquareAtPoint = (event: MouseEvent): string | null => {
-    const target = event.target;
+  const getSquareAtPoint = ({
+    clientX,
+    clientY,
+    target,
+  }: {
+    clientX: number;
+    clientY: number;
+    target: EventTarget | null;
+  }): string | null => {
     if (target instanceof Element) {
       const fromTarget = target.closest("[data-square]") as HTMLElement | null;
       if (fromTarget?.dataset.square) {
@@ -331,7 +364,7 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
       return null;
     }
 
-    const squareElement = document.elementFromPoint(event.clientX, event.clientY)?.closest("[data-square]") as
+    const squareElement = document.elementFromPoint(clientX, clientY)?.closest("[data-square]") as
       | HTMLElement
       | null;
     return squareElement?.dataset.square ?? null;
@@ -342,17 +375,25 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
       return;
     }
 
-    const handleWindowMouseMove = (event: MouseEvent) => {
+    const handleWindowPointerMove = (event: PointerEvent) => {
+      if (activePointerIdRef.current !== null && event.pointerId !== activePointerIdRef.current) {
+        return;
+      }
+
       const start = dragStartPointerRef.current;
       if (start && !isDraggingVisual) {
         const deltaX = event.clientX - start.x;
         const deltaY = event.clientY - start.y;
-        if (Math.hypot(deltaX, deltaY) >= 3) {
+        if (Math.hypot(deltaX, deltaY) >= 4) {
           setIsDraggingVisual(true);
         }
       }
       setDragPointer({ x: event.clientX, y: event.clientY });
-      const hoveredSquare = getSquareAtPoint(event);
+      const hoveredSquare = getSquareAtPoint({
+        clientX: event.clientX,
+        clientY: event.clientY,
+        target: event.target,
+      });
       if (hoveredSquare && legalTargets.has(hoveredSquare)) {
         hoveredDropSquareRef.current = hoveredSquare;
         setHoveredDropSquare(hoveredSquare);
@@ -362,19 +403,29 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
       }
     };
 
-    const handleWindowMouseUp = (event: MouseEvent) => {
-      const dropSquare = getSquareAtPoint(event) ?? hoveredDropSquareRef.current;
+    const handleWindowPointerEnd = (event: PointerEvent) => {
+      if (activePointerIdRef.current !== null && event.pointerId !== activePointerIdRef.current) {
+        return;
+      }
+
+      const dropSquare = getSquareAtPoint({
+        clientX: event.clientX,
+        clientY: event.clientY,
+        target: event.target,
+      }) ?? hoveredDropSquareRef.current;
       finalizeDrag(dropSquare);
     };
 
-    window.addEventListener("mousemove", handleWindowMouseMove);
-    window.addEventListener("mouseup", handleWindowMouseUp);
+    window.addEventListener("pointermove", handleWindowPointerMove);
+    window.addEventListener("pointerup", handleWindowPointerEnd);
+    window.addEventListener("pointercancel", handleWindowPointerEnd);
 
     return () => {
-      window.removeEventListener("mousemove", handleWindowMouseMove);
-      window.removeEventListener("mouseup", handleWindowMouseUp);
+      window.removeEventListener("pointermove", handleWindowPointerMove);
+      window.removeEventListener("pointerup", handleWindowPointerEnd);
+      window.removeEventListener("pointercancel", handleWindowPointerEnd);
     };
-  }, [draggedSquare, isDraggingVisual, legalTargets, hoveredDropSquare]);
+  }, [draggedSquare, isDraggingVisual, legalTargets]);
 
   useEffect(() => {
     if (!planningStartSquare || typeof window === "undefined") {
@@ -386,7 +437,12 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
         return;
       }
 
-      const dropSquare = getSquareAtPoint(event) ?? planningHoverSquare ?? planningStartSquare;
+      const dropSquare =
+        getSquareAtPoint({
+          clientX: event.clientX,
+          clientY: event.clientY,
+          target: event.target,
+        }) ?? planningHoverSquare ?? planningStartSquare;
       if (!dropSquare) {
         resetPlanningInteractionState();
         return;
@@ -453,8 +509,8 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
       setSelectedSquare(null);
     };
 
-    const handlePieceMouseDown = (event: React.MouseEvent<HTMLImageElement>) => {
-      if (event.button !== 0) {
+    const handlePiecePointerDown = (event: React.PointerEvent<HTMLImageElement>) => {
+      if (event.button !== 0 || !event.isPrimary) {
         return;
       }
       if (planningStartSquare) {
@@ -464,6 +520,17 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
         return;
       }
 
+      event.preventDefault();
+      if (typeof event.currentTarget.setPointerCapture === "function") {
+        try {
+          event.currentTarget.setPointerCapture(event.pointerId);
+        } catch {
+          // Ignore environments that do not support capture.
+        }
+      }
+
+      activePointerIdRef.current = event.pointerId;
+      activePointerTargetRef.current = event.currentTarget;
       setDragPointer({ x: event.clientX, y: event.clientY });
       dragStartPointerRef.current = { x: event.clientX, y: event.clientY };
       suppressClickRef.current = true;
@@ -495,16 +562,6 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
       }
     };
 
-    const handleSquareMouseUp = () => {
-      if (planningStartSquare) {
-        return;
-      }
-      if (!draggedSquareRef.current) {
-        return;
-      }
-      finalizeDrag(square);
-    };
-
     const handleSquareMouseDown = (event: React.MouseEvent<HTMLButtonElement>) => {
       if (event.button !== 2) {
         return;
@@ -524,7 +581,6 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
         onClick={handleClick}
         onMouseDown={handleSquareMouseDown}
         onMouseEnter={handleSquareMouseEnter}
-        onMouseUp={handleSquareMouseUp}
         draggable={false}
         className={[
           "relative aspect-square",
@@ -563,7 +619,7 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
                 .filter(Boolean)
                 .join(" ")}
               draggable={false}
-              onMouseDown={handlePieceMouseDown}
+              onPointerDown={handlePiecePointerDown}
             />
           </span>
         ) : null}

@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { BoardSurface } from "./BoardSurface";
 
@@ -38,7 +38,20 @@ function drawPlanningArrow(from: string, to: string) {
   fireEvent.mouseUp(toSquare, { button: 2, clientX: 120, clientY: 120 });
 }
 
+const originalSetPointerCapture = HTMLElement.prototype.setPointerCapture;
+const originalReleasePointerCapture = HTMLElement.prototype.releasePointerCapture;
+
 describe("BoardSurface", () => {
+  beforeAll(() => {
+    HTMLElement.prototype.setPointerCapture = originalSetPointerCapture ?? (() => {});
+    HTMLElement.prototype.releasePointerCapture = originalReleasePointerCapture ?? (() => {});
+  });
+
+  afterAll(() => {
+    HTMLElement.prototype.setPointerCapture = originalSetPointerCapture;
+    HTMLElement.prototype.releasePointerCapture = originalReleasePointerCapture;
+  });
+
   it("dispatches move intent for a legal move path", async () => {
     const onMoveIntent = vi.fn();
     const user = userEvent.setup();
@@ -94,9 +107,9 @@ describe("BoardSurface", () => {
     const piece = within(from).getByRole("img", { name: "white p" });
     const to = screen.getByRole("button", { name: "e4" });
 
-    fireEvent.mouseDown(piece);
-    fireEvent.mouseEnter(to);
-    fireEvent.mouseUp(to);
+    fireEvent.pointerDown(piece, { button: 0, pointerId: 1, clientX: 20, clientY: 20, isPrimary: true });
+    fireEvent.pointerMove(window, { pointerId: 1, clientX: 30, clientY: 30 });
+    fireEvent.pointerUp(to, { pointerId: 1, clientX: 40, clientY: 40 });
 
     expect(onMoveIntent).toHaveBeenCalledTimes(1);
     expect(onMoveIntent).toHaveBeenCalledWith({ from: "e2", to: "e4", promotion: undefined });
@@ -117,9 +130,9 @@ describe("BoardSurface", () => {
     const from = screen.getByRole("button", { name: "e2" });
     const piece = within(from).getByRole("img", { name: "white p" });
     const to = screen.getByRole("button", { name: "e5" });
-    fireEvent.mouseDown(piece);
-    fireEvent.mouseEnter(to);
-    fireEvent.mouseUp(to);
+    fireEvent.pointerDown(piece, { button: 0, pointerId: 1, clientX: 20, clientY: 20, isPrimary: true });
+    fireEvent.pointerMove(window, { pointerId: 1, clientX: 30, clientY: 30 });
+    fireEvent.pointerUp(to, { pointerId: 1, clientX: 40, clientY: 40 });
 
     expect(onMoveIntent).not.toHaveBeenCalled();
   });
@@ -235,8 +248,8 @@ describe("BoardSurface", () => {
     const from = screen.getByRole("button", { name: "e2" });
     const piece = within(from).getByRole("img", { name: "white p" });
 
-    fireEvent.mouseDown(piece, { clientX: 20, clientY: 20 });
-    fireEvent.mouseMove(window, { clientX: 30, clientY: 30 });
+    fireEvent.pointerDown(piece, { button: 0, pointerId: 1, clientX: 20, clientY: 20, isPrimary: true });
+    fireEvent.pointerMove(window, { pointerId: 1, clientX: 30, clientY: 30 });
 
     expect(piece.className).toContain("opacity-0");
     expect(container.querySelector('img[aria-hidden="true"]')).not.toBeNull();

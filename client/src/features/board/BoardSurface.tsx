@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Chess } from "chess.js";
 
 import type { BoardOrientation, GameSnapshot, MoveIntent, PlayerColor } from "./types";
@@ -37,6 +37,110 @@ const PIECE_SYMBOLS: Record<`${BoardPiece["color"]}${BoardPiece["type"]}`, strin
   bq: "/piece/cburnett/bQ.svg",
   bk: "/piece/cburnett/bK.svg",
 };
+
+type BoardCellProps = {
+  square: string;
+  isLight: boolean;
+  isSelected: boolean;
+  isLegalTarget: boolean;
+  isHoveredLegalTarget: boolean;
+  isPlaceTarget: boolean;
+  isOwnedPiece: boolean;
+  isPlannedHighlight: boolean;
+  canInteract: boolean;
+  isDraggingSource: boolean;
+  isDraggingVisual: boolean;
+  isPlacedSquare: boolean;
+  piece: BoardPiece | undefined;
+  onSquareClick: (square: string) => void;
+  onSquareMouseDown: (square: string, event: React.MouseEvent<HTMLButtonElement>) => void;
+  onSquareMouseEnter: (square: string) => void;
+  onPiecePointerDown: (
+    square: string,
+    piece: BoardPiece,
+    event: React.PointerEvent<HTMLImageElement>,
+  ) => void;
+};
+
+const BoardCell = memo(function BoardCell({
+  square,
+  isLight,
+  isSelected,
+  isLegalTarget,
+  isHoveredLegalTarget,
+  isPlaceTarget,
+  isOwnedPiece,
+  isPlannedHighlight,
+  canInteract,
+  isDraggingSource,
+  isDraggingVisual,
+  isPlacedSquare,
+  piece,
+  onSquareClick,
+  onSquareMouseDown,
+  onSquareMouseEnter,
+  onPiecePointerDown,
+}: BoardCellProps) {
+  return (
+    <button
+      type="button"
+      data-square={square}
+      aria-label={square}
+      onClick={() => onSquareClick(square)}
+      onMouseDown={(event) => onSquareMouseDown(square, event)}
+      onMouseEnter={() => onSquareMouseEnter(square)}
+      draggable={false}
+      className={[
+        "relative aspect-square",
+        isLight ? "bg-neutral-200" : "bg-board-dark",
+        isSelected ? "outline-2 -outline-offset-2 outline-app-purple-strong" : "",
+        isPlaceTarget ? "cursor-grab" : "cursor-default",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+    >
+      {isDraggingSource && isDraggingVisual && isLegalTarget ? (
+        <span className="pointer-events-none absolute inset-[5%] rounded-[18%] bg-[#8fcea2]/7 ring-1 ring-inset ring-[#8fcea2]/35" />
+      ) : null}
+      {isPlannedHighlight ? (
+        <span
+          data-plan-highlight={square}
+          className="pointer-events-none absolute inset-0 bg-app-purple-soft/12 ring-2 ring-inset ring-app-purple-soft/70"
+        />
+      ) : null}
+      {isHoveredLegalTarget ? (
+        <span className="pointer-events-none absolute inset-0 ring-[3px] ring-inset ring-[#8fcea2]/80" />
+      ) : null}
+
+      {piece ? (
+        <span className="absolute inset-0 grid place-items-center p-[6%]">
+          <img
+            src={PIECE_SYMBOLS[`${piece.color}${piece.type}`]}
+            alt={`${piece.color === "w" ? "white" : "black"} ${piece.type}`}
+            className={[
+              "h-full w-full select-none object-contain transition-[opacity,transform] duration-100 ease-out",
+              canInteract && isOwnedPiece ? "cursor-grab active:cursor-grabbing" : "cursor-default",
+              isDraggingSource ? "cursor-grabbing" : "",
+              isDraggingSource ? "scale-[1.12]" : "",
+              isDraggingSource && isDraggingVisual ? "opacity-0" : "",
+              isPlacedSquare ? "piece-place-animate" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+            draggable={false}
+            onPointerDown={(event) => onPiecePointerDown(square, piece, event)}
+          />
+        </span>
+      ) : null}
+
+      {!piece && isLegalTarget ? (
+        <span className="pointer-events-none absolute inset-0 grid place-items-center">
+          <span className="h-5 w-5 rounded-full bg-[#5f9d73]/90" />
+        </span>
+      ) : null}
+    </button>
+  );
+});
 
 function squareFromDisplayIndex(index: number, orientation: BoardOrientation): string {
   const row = Math.floor(index / 8);
@@ -122,11 +226,15 @@ function deriveLegalTargets(fen: string, fromSquare: string | null): Set<string>
   return new Set(moves.map((move) => move.to));
 }
 
-export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent }: BoardSurfaceProps) {
+export const BoardSurface = memo(function BoardSurface({
+  snapshot,
+  orientation,
+  playerColor,
+  onMoveIntent,
+}: BoardSurfaceProps) {
   const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
   const [draggedSquare, setDraggedSquare] = useState<string | null>(null);
   const [hoveredDropSquare, setHoveredDropSquare] = useState<string | null>(null);
-  const [dragPointer, setDragPointer] = useState<{ x: number; y: number } | null>(null);
   const suppressClickRef = useRef(false);
   const dropHandledRef = useRef(false);
   const draggedSquareRef = useRef<string | null>(null);
@@ -134,7 +242,14 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
   const legalTargetsRef = useRef<Set<string>>(new Set());
   const placeAnimationTimeoutRef = useRef<number | null>(null);
   const dragCleanupFrameRef = useRef<number | null>(null);
+  const dragPreviewFrameRef = useRef<number | null>(null);
   const dragStartPointerRef = useRef<{ x: number; y: number } | null>(null);
+  const dragPointerRef = useRef<{ x: number; y: number } | null>(null);
+  const dragGrabOffsetRef = useRef<{ x: number; y: number } | null>(null);
+  const dragPreviewSizeRef = useRef<{ width: number; height: number } | null>(null);
+  const activePointerIdRef = useRef<number | null>(null);
+  const activePointerTargetRef = useRef<HTMLElement | null>(null);
+  const dragPreviewRef = useRef<HTMLDivElement | null>(null);
   const [optimisticFen, setOptimisticFen] = useState<string | null>(null);
   const [placedSquare, setPlacedSquare] = useState<string | null>(null);
   const [draggedPiecePreview, setDraggedPiecePreview] = useState<BoardPiece | null>(null);
@@ -148,7 +263,6 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
     setSelectedSquare(null);
     setDraggedSquare(null);
     setHoveredDropSquare(null);
-    setDragPointer(null);
     setOptimisticFen(null);
     setPlacedSquare(null);
     setDraggedPiecePreview(null);
@@ -158,6 +272,9 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
     setPlanningStartSquare(null);
     setPlanningHoverSquare(null);
     dragStartPointerRef.current = null;
+    dragPointerRef.current = null;
+    dragGrabOffsetRef.current = null;
+    dragPreviewSizeRef.current = null;
     if (placeAnimationTimeoutRef.current !== null) {
       window.clearTimeout(placeAnimationTimeoutRef.current);
       placeAnimationTimeoutRef.current = null;
@@ -165,6 +282,10 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
     if (dragCleanupFrameRef.current !== null) {
       window.cancelAnimationFrame(dragCleanupFrameRef.current);
       dragCleanupFrameRef.current = null;
+    }
+    if (dragPreviewFrameRef.current !== null) {
+      window.cancelAnimationFrame(dragPreviewFrameRef.current);
+      dragPreviewFrameRef.current = null;
     }
     suppressClickRef.current = false;
     dropHandledRef.current = false;
@@ -194,7 +315,14 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
       if (dragCleanupFrameRef.current !== null) {
         window.cancelAnimationFrame(dragCleanupFrameRef.current);
       }
+      if (dragPreviewFrameRef.current !== null) {
+        window.cancelAnimationFrame(dragPreviewFrameRef.current);
+      }
       dragStartPointerRef.current = null;
+      dragPointerRef.current = null;
+      dragGrabOffsetRef.current = null;
+      dragPreviewSizeRef.current = null;
+      releaseActivePointerCapture();
     };
   }, []);
 
@@ -215,6 +343,27 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
   const draggedPiece = draggedPiecePreview;
   const planningHighlightSet = useMemo(() => new Set(planningHighlights), [planningHighlights]);
 
+  const releaseActivePointerCapture = () => {
+    const pointerTarget = activePointerTargetRef.current;
+    const pointerId = activePointerIdRef.current;
+    if (!pointerTarget || pointerId === null) {
+      activePointerTargetRef.current = null;
+      activePointerIdRef.current = null;
+      return;
+    }
+
+    if (typeof pointerTarget.releasePointerCapture === "function") {
+      try {
+        pointerTarget.releasePointerCapture(pointerId);
+      } catch {
+        // Ignore cases where capture is already gone.
+      }
+    }
+
+    activePointerTargetRef.current = null;
+    activePointerIdRef.current = null;
+  };
+
   const clearPlanningMarks = () => {
     setPlanningArrows([]);
     setPlanningHighlights([]);
@@ -229,12 +378,19 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
     setSelectedSquare(null);
     setDraggedSquare(null);
     setHoveredDropSquare(null);
-    setDragPointer(null);
     setDraggedPiecePreview(null);
     setIsDraggingVisual(false);
     draggedSquareRef.current = null;
     hoveredDropSquareRef.current = null;
     dragStartPointerRef.current = null;
+    dragPointerRef.current = null;
+    dragGrabOffsetRef.current = null;
+    dragPreviewSizeRef.current = null;
+    if (dragPreviewFrameRef.current !== null) {
+      window.cancelAnimationFrame(dragPreviewFrameRef.current);
+      dragPreviewFrameRef.current = null;
+    }
+    releaseActivePointerCapture();
     suppressClickRef.current = false;
     dropHandledRef.current = false;
   };
@@ -250,6 +406,36 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
   useEffect(() => {
     legalTargetsRef.current = legalTargets;
   }, [legalTargets]);
+
+  const syncDragPreviewPosition = () => {
+    const dragPreview = dragPreviewRef.current;
+    const pointer = dragPointerRef.current;
+    const grabOffset = dragGrabOffsetRef.current;
+    if (!dragPreview || !pointer || !grabOffset) {
+      return;
+    }
+
+    dragPreview.style.transform = `translate3d(${pointer.x - grabOffset.x}px, ${pointer.y - grabOffset.y}px, 0) scale(1.12)`;
+  };
+
+  const scheduleDragPreviewSync = () => {
+    if (dragPreviewFrameRef.current !== null || typeof window === "undefined") {
+      return;
+    }
+
+    dragPreviewFrameRef.current = window.requestAnimationFrame(() => {
+      dragPreviewFrameRef.current = null;
+      syncDragPreviewPosition();
+    });
+  };
+
+  useEffect(() => {
+    if (!isDraggingVisual) {
+      return;
+    }
+
+    syncDragPreviewPosition();
+  }, [isDraggingVisual, draggedPiecePreview]);
 
   const dispatchMove = (from: string, to: string) => {
     const selectedPiece = snapshotPieces[from];
@@ -291,12 +477,19 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
     const cleanupDragState = () => {
       setDraggedSquare(null);
       setHoveredDropSquare(null);
-      setDragPointer(null);
       setDraggedPiecePreview(null);
       setIsDraggingVisual(false);
       dragStartPointerRef.current = null;
+      dragPointerRef.current = null;
+      dragGrabOffsetRef.current = null;
+      dragPreviewSizeRef.current = null;
       draggedSquareRef.current = null;
       hoveredDropSquareRef.current = null;
+      if (dragPreviewFrameRef.current !== null) {
+        window.cancelAnimationFrame(dragPreviewFrameRef.current);
+        dragPreviewFrameRef.current = null;
+      }
+      releaseActivePointerCapture();
     };
     if (isValidDrop && typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
       if (dragCleanupFrameRef.current !== null) {
@@ -315,26 +508,39 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
     }, 0);
   };
 
-  const getSquareAtPoint = (event: MouseEvent): string | null => {
-    const target = event.target;
-    if (target instanceof Element) {
-      const fromTarget = target.closest("[data-square]") as HTMLElement | null;
-      if (fromTarget?.dataset.square) {
-        return fromTarget.dataset.square;
-      }
-    }
-
+  const getSquareAtPoint = ({
+    clientX,
+    clientY,
+    target,
+  }: {
+    clientX: number;
+    clientY: number;
+    target: EventTarget | null;
+  }): string | null => {
     if (
       typeof document === "undefined" ||
       typeof document.elementFromPoint !== "function"
     ) {
+      if (target instanceof Element) {
+        const fromTarget = target.closest("[data-square]") as HTMLElement | null;
+        return fromTarget?.dataset.square ?? null;
+      }
       return null;
     }
 
-    const squareElement = document.elementFromPoint(event.clientX, event.clientY)?.closest("[data-square]") as
+    const squareElement = document.elementFromPoint(clientX, clientY)?.closest("[data-square]") as
       | HTMLElement
       | null;
-    return squareElement?.dataset.square ?? null;
+    if (squareElement?.dataset.square) {
+      return squareElement.dataset.square;
+    }
+
+    if (target instanceof Element) {
+      const fromTarget = target.closest("[data-square]") as HTMLElement | null;
+      return fromTarget?.dataset.square ?? null;
+    }
+
+    return null;
   };
 
   useEffect(() => {
@@ -342,39 +548,62 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
       return;
     }
 
-    const handleWindowMouseMove = (event: MouseEvent) => {
+    const handleWindowPointerMove = (event: PointerEvent) => {
+      if (activePointerIdRef.current !== null && event.pointerId !== activePointerIdRef.current) {
+        return;
+      }
+
       const start = dragStartPointerRef.current;
       if (start && !isDraggingVisual) {
         const deltaX = event.clientX - start.x;
         const deltaY = event.clientY - start.y;
-        if (Math.hypot(deltaX, deltaY) >= 3) {
+        if (Math.hypot(deltaX, deltaY) >= 4) {
           setIsDraggingVisual(true);
         }
       }
-      setDragPointer({ x: event.clientX, y: event.clientY });
-      const hoveredSquare = getSquareAtPoint(event);
+      dragPointerRef.current = { x: event.clientX, y: event.clientY };
+      scheduleDragPreviewSync();
+      const hoveredSquare = getSquareAtPoint({
+        clientX: event.clientX,
+        clientY: event.clientY,
+        target: event.target,
+      });
       if (hoveredSquare && legalTargets.has(hoveredSquare)) {
-        hoveredDropSquareRef.current = hoveredSquare;
-        setHoveredDropSquare(hoveredSquare);
+        if (hoveredDropSquareRef.current !== hoveredSquare) {
+          hoveredDropSquareRef.current = hoveredSquare;
+          setHoveredDropSquare(hoveredSquare);
+        }
       } else {
-        hoveredDropSquareRef.current = null;
-        setHoveredDropSquare(null);
+        if (hoveredDropSquareRef.current !== null) {
+          hoveredDropSquareRef.current = null;
+          setHoveredDropSquare(null);
+        }
       }
     };
 
-    const handleWindowMouseUp = (event: MouseEvent) => {
-      const dropSquare = getSquareAtPoint(event) ?? hoveredDropSquareRef.current;
+    const handleWindowPointerEnd = (event: PointerEvent) => {
+      if (activePointerIdRef.current !== null && event.pointerId !== activePointerIdRef.current) {
+        return;
+      }
+
+      const dropSquare = getSquareAtPoint({
+        clientX: event.clientX,
+        clientY: event.clientY,
+        target: event.target,
+      }) ?? hoveredDropSquareRef.current;
       finalizeDrag(dropSquare);
     };
 
-    window.addEventListener("mousemove", handleWindowMouseMove);
-    window.addEventListener("mouseup", handleWindowMouseUp);
+    window.addEventListener("pointermove", handleWindowPointerMove);
+    window.addEventListener("pointerup", handleWindowPointerEnd);
+    window.addEventListener("pointercancel", handleWindowPointerEnd);
 
     return () => {
-      window.removeEventListener("mousemove", handleWindowMouseMove);
-      window.removeEventListener("mouseup", handleWindowMouseUp);
+      window.removeEventListener("pointermove", handleWindowPointerMove);
+      window.removeEventListener("pointerup", handleWindowPointerEnd);
+      window.removeEventListener("pointercancel", handleWindowPointerEnd);
     };
-  }, [draggedSquare, isDraggingVisual, legalTargets, hoveredDropSquare]);
+  }, [draggedSquare, isDraggingVisual, legalTargets]);
 
   useEffect(() => {
     if (!planningStartSquare || typeof window === "undefined") {
@@ -386,7 +615,12 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
         return;
       }
 
-      const dropSquare = getSquareAtPoint(event) ?? planningHoverSquare ?? planningStartSquare;
+      const dropSquare =
+        getSquareAtPoint({
+          clientX: event.clientX,
+          clientY: event.clientY,
+          target: event.target,
+        }) ?? planningHoverSquare ?? planningStartSquare;
       if (!dropSquare) {
         resetPlanningInteractionState();
         return;
@@ -415,18 +649,12 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
     };
   }, [planningHoverSquare, planningStartSquare]);
 
-  const cells = Array.from({ length: BOARD_SIZE }, (_, index) => {
-    const square = squareFromDisplayIndex(index, orientation);
-    const isLight = isLightSquare(square);
-    const piece = pieces[square];
-    const isSelected = selectedSquare === square;
-    const isLegalTarget = legalTargets.has(square);
-    const isHoveredLegalTarget = hoveredDropSquare === square && Boolean(draggedSquare) && isLegalTarget;
-    const isPlaceTarget = Boolean(selectedSquare) && isLegalTarget && !draggedSquare;
-    const isOwnedPiece = Boolean(piece && piece.color === ownedColor);
-    const isPlannedHighlight = planningHighlightSet.has(square);
+  const handleSquareClick = useCallback(
+    (square: string) => {
+      const piece = pieces[square];
+      const isOwnedPiece = Boolean(piece && piece.color === ownedColor);
+      const isLegalTarget = legalTargets.has(square);
 
-    const handleClick = () => {
       if (planningStartSquare) {
         return;
       }
@@ -451,21 +679,54 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
       }
 
       setSelectedSquare(null);
-    };
+    },
+    [
+      planningStartSquare,
+      canInteract,
+      playerColor,
+      selectedSquare,
+      dispatchMove,
+      pieces,
+      ownedColor,
+      legalTargets,
+    ],
+  );
 
-    const handlePieceMouseDown = (event: React.MouseEvent<HTMLImageElement>) => {
-      if (event.button !== 0) {
+  const handlePiecePointerDown = useCallback(
+    (square: string, piece: BoardPiece, event: React.PointerEvent<HTMLImageElement>) => {
+      if (event.button !== 0 || !event.isPrimary) {
         return;
       }
       if (planningStartSquare) {
         return;
       }
+      const isOwnedPiece = piece.color === ownedColor;
       if (!canInteract || !isOwnedPiece) {
         return;
       }
 
-      setDragPointer({ x: event.clientX, y: event.clientY });
+      event.preventDefault();
+      if (typeof event.currentTarget.setPointerCapture === "function") {
+        try {
+          event.currentTarget.setPointerCapture(event.pointerId);
+        } catch {
+          // Ignore environments that do not support capture.
+        }
+      }
+
+      activePointerIdRef.current = event.pointerId;
+      activePointerTargetRef.current = event.currentTarget;
+      const rect = event.currentTarget.getBoundingClientRect();
       dragStartPointerRef.current = { x: event.clientX, y: event.clientY };
+      dragPointerRef.current = { x: event.clientX, y: event.clientY };
+      dragGrabOffsetRef.current = {
+        x: event.clientX - rect.left,
+        y: event.clientY - rect.top,
+      };
+      dragPreviewSizeRef.current = {
+        width: rect.width,
+        height: rect.height,
+      };
       suppressClickRef.current = true;
       dropHandledRef.current = false;
       draggedSquareRef.current = square;
@@ -475,9 +736,11 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
       setSelectedSquare(square);
       hoveredDropSquareRef.current = null;
       setHoveredDropSquare(null);
-    };
+    },
+    [planningStartSquare, canInteract, ownedColor],
+  );
 
-    const handleSquareMouseEnter = () => {
+  const handleSquareMouseEnter = useCallback((square: string) => {
       if (planningStartSquare) {
         setPlanningHoverSquare(square);
       }
@@ -487,25 +750,19 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
       }
 
       if (legalTargetsRef.current.has(square)) {
-        hoveredDropSquareRef.current = square;
-        setHoveredDropSquare(square);
+        if (hoveredDropSquareRef.current !== square) {
+          hoveredDropSquareRef.current = square;
+          setHoveredDropSquare(square);
+        }
       } else {
-        hoveredDropSquareRef.current = null;
-        setHoveredDropSquare(null);
+        if (hoveredDropSquareRef.current !== null) {
+          hoveredDropSquareRef.current = null;
+          setHoveredDropSquare(null);
+        }
       }
-    };
+    }, [planningStartSquare]);
 
-    const handleSquareMouseUp = () => {
-      if (planningStartSquare) {
-        return;
-      }
-      if (!draggedSquareRef.current) {
-        return;
-      }
-      finalizeDrag(square);
-    };
-
-    const handleSquareMouseDown = (event: React.MouseEvent<HTMLButtonElement>) => {
+  const handleSquareMouseDown = useCallback((square: string, event: React.MouseEvent<HTMLButtonElement>) => {
       if (event.button !== 2) {
         return;
       }
@@ -513,67 +770,35 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
       resetMoveInteractionState();
       setPlanningStartSquare(square);
       setPlanningHoverSquare(square);
-    };
+    }, []);
+
+  const cells = Array.from({ length: BOARD_SIZE }, (_, index) => {
+    const square = squareFromDisplayIndex(index, orientation);
+    const piece = pieces[square];
 
     return (
-      <button
+      <BoardCell
         key={square}
-        type="button"
-        data-square={square}
-        aria-label={square}
-        onClick={handleClick}
-        onMouseDown={handleSquareMouseDown}
-        onMouseEnter={handleSquareMouseEnter}
-        onMouseUp={handleSquareMouseUp}
-        draggable={false}
-        className={[
-          "relative aspect-square",
-          isLight ? "bg-neutral-200" : "bg-board-dark",
-          isSelected ? "outline-2 -outline-offset-2 outline-app-purple-strong" : "",
-          isPlaceTarget ? "cursor-grab" : "cursor-default",
-        ]
-          .filter(Boolean)
-          .join(" ")}
-      >
-        {draggedSquare && isDraggingVisual && isLegalTarget ? (
-          <span className="pointer-events-none absolute inset-0 bg-[#8fcea2]/8" />
-        ) : null}
-        {isPlannedHighlight ? (
-          <span
-            data-plan-highlight={square}
-            className="pointer-events-none absolute inset-0 bg-app-purple-soft/12 ring-2 ring-inset ring-app-purple-soft/70"
-          />
-        ) : null}
-        {isHoveredLegalTarget ? (
-          <span className="pointer-events-none absolute inset-0 ring-2 ring-inset ring-[#8fcea2]/85" />
-        ) : null}
-
-        {piece ? (
-          <span className="absolute inset-0 grid place-items-center p-[6%]">
-            <img
-              src={PIECE_SYMBOLS[`${piece.color}${piece.type}`]}
-              alt={`${piece.color === "w" ? "white" : "black"} ${piece.type}`}
-              className={[
-                "h-full w-full select-none object-contain",
-                canInteract && isOwnedPiece ? "cursor-grab active:cursor-grabbing" : "cursor-default",
-                draggedSquare === square ? "cursor-grabbing" : "",
-                draggedSquare === square && isDraggingVisual ? "opacity-0" : "",
-                placedSquare === square ? "piece-place-animate" : "",
-              ]
-                .filter(Boolean)
-                .join(" ")}
-              draggable={false}
-              onMouseDown={handlePieceMouseDown}
-            />
-          </span>
-        ) : null}
-
-        {!piece && isLegalTarget ? (
-          <span className="pointer-events-none absolute inset-0 grid place-items-center">
-            <span className="h-3.5 w-3.5 rounded-full bg-[#8fcea2]/80" />
-          </span>
-        ) : null}
-      </button>
+        square={square}
+        isLight={isLightSquare(square)}
+        isSelected={selectedSquare === square}
+        isLegalTarget={legalTargets.has(square)}
+        isHoveredLegalTarget={
+          hoveredDropSquare === square && draggedSquare !== null && legalTargets.has(square)
+        }
+        isPlaceTarget={selectedSquare !== null && legalTargets.has(square) && draggedSquare === null}
+        isOwnedPiece={Boolean(piece && piece.color === ownedColor)}
+        isPlannedHighlight={planningHighlightSet.has(square)}
+        canInteract={canInteract}
+        isDraggingSource={draggedSquare === square}
+        isDraggingVisual={isDraggingVisual}
+        isPlacedSquare={placedSquare === square}
+        piece={piece}
+        onSquareClick={handleSquareClick}
+        onSquareMouseDown={handleSquareMouseDown}
+        onSquareMouseEnter={handleSquareMouseEnter}
+        onPiecePointerDown={handlePiecePointerDown}
+      />
     );
   });
 
@@ -683,20 +908,31 @@ export function BoardSurface({ snapshot, orientation, playerColor, onMoveIntent 
           {cells}
         </div>
       </div>
-      {draggedPiece && dragPointer && isDraggingVisual ? (
+      {draggedPiece && isDraggingVisual ? (
         <div
-          className="pointer-events-none fixed z-50 h-[clamp(34px,4vw,56px)] w-[clamp(34px,4vw,56px)] -translate-x-1/2 -translate-y-1/2"
-          style={{ left: dragPointer.x, top: dragPointer.y }}
+          ref={dragPreviewRef}
+          className="pointer-events-none fixed z-50 h-[clamp(34px,4vw,56px)] w-[clamp(34px,4vw,56px)]"
+          style={{
+            left: 0,
+            top: 0,
+            width: dragPreviewSizeRef.current?.width ?? undefined,
+            height: dragPreviewSizeRef.current?.height ?? undefined,
+            willChange: "transform",
+            transform:
+              dragPointerRef.current !== null && dragGrabOffsetRef.current !== null
+                ? `translate3d(${dragPointerRef.current.x - dragGrabOffsetRef.current.x}px, ${dragPointerRef.current.y - dragGrabOffsetRef.current.y}px, 0) scale(1.12)`
+                : "translate3d(-9999px, -9999px, 0)",
+          }}
         >
           <img
             src={PIECE_SYMBOLS[`${draggedPiece.color}${draggedPiece.type}`]}
             alt=""
             aria-hidden="true"
-            className="h-full w-full object-contain drop-shadow-[0_8px_16px_rgba(0,0,0,0.45)]"
+            className="block h-full w-full object-contain"
             draggable={false}
           />
         </div>
       ) : null}
     </section>
   );
-}
+});

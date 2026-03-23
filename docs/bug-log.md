@@ -1,5 +1,37 @@
 # Bug Log
 
+## 2026-03-23 — Play screen atmosphere and dev-mode overhead masked board interaction performance
+- Symptom: Piece dragging, panel motion, and general UI responsiveness felt broadly choppy on `/play`, especially while connected to a live game.
+- Root cause: The play route was carrying expensive atmosphere/render work (full-screen dotted map, clock-driven rerenders, heavier panel treatment) while local development was also running under React StrictMode.
+- Fix: Simplified `/play` presentation, removed the play-page dotted map, memoized board composition boundaries, and disabled StrictMode locally so gameplay interactions are not penalized by decorative work.
+- Files: `client/src/main.tsx`, `client/src/pages/PlayPage.tsx`, `client/src/features/board/BoardSurface.tsx`, `client/src/features/room/WaitingRoomPanel.tsx`
+
+---
+
+## 2026-03-23 — Pointer-captured drag preview regressed pickup and drop feel
+- Symptom: Dragging initially felt detached from the cursor, previewed with a square-ish dark halo, and legal drops could snap back instead of applying the move.
+- Root cause: Preview positioning ignored the original grab offset, drag shadow darkened transparent SVG bounds, and pointer-captured `pointerup` events could resolve back to the source square if hit testing trusted the event target first.
+- Fix: Stored grab offset and preview size from pointer-down, removed preview shadow, prioritized `elementFromPoint` for drop targeting, and tuned legal-target visuals plus press-and-hold lift behavior.
+- Files: `client/src/features/board/BoardSurface.tsx`, `client/src/features/board/BoardSurface.test.tsx`
+
+---
+
+## 2026-03-23 — Waiting-room simplification accidentally bypassed match-found animation path
+- Symptom: The bouncing "finding match" loader and the flip into the active panel stopped appearing during room activation.
+- Root cause: A conditional split between a flip shell and a static active shell made the waiting/match-found transition path easy to skip, and the 3D perspective wrapper was removed.
+- Fix: Restored the always-mounted flip shell, brought back `perspective-distant`, and preserved the waiting-state loader + match-found burst path while keeping the play screen otherwise lighter.
+- Files: `client/src/features/room/WaitingRoomPanel.tsx`
+
+---
+
+## 2026-03-23 — Client and server timer paths needed authoritative time-control coverage
+- Symptom: Clocks, timeout status, and reconnect/partial-snapshot timer continuity were not represented end-to-end in the gameplay stack.
+- Root cause: Earlier gameplay milestones shipped move authority and result handling before time control and timer state existed as a first-class contract.
+- Fix: Added authoritative server time-control config and timer state, client clock/timeout UI, partial-snapshot timer projection, and regression tests for timeout, increment, drift, reconnect, and turn-change behavior.
+- Files: `server/src/game/GameEngine.ts`, `server/src/game/GameEngine.test.ts`, `client/src/features/ws/useWsSync.ts`, `client/src/features/ws/useWsSync.test.tsx`, `client/src/pages/PlayPage.tsx`, `client/src/features/room/WaitingRoomPanel.tsx`, `client/src/features/room/WaitingRoomPanel.test.tsx`
+
+---
+
 ## 2026-03-11 — Gameplay side panel lacked synchronized move/result visibility
 - Symptom: `/play` showed room controls but did not surface move history, turn state, or terminal result context in the side panel.
 - Root cause: Client state adapter tracked only room/game snapshots without explicit move-feed projection.

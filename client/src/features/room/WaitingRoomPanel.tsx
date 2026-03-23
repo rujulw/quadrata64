@@ -152,17 +152,14 @@ export function WaitingRoomPanel({
   }, [moveFeed]);
 
   return (
-    <section className="relative h-full w-full overflow-hidden rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] shadow-[0_24px_80px_rgba(0,0,0,0.35)] backdrop-blur-xl">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(168,85,247,0.18),transparent_32%),radial-gradient(circle_at_bottom_right,rgba(255,255,255,0.05),transparent_28%)]" />
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/10" />
-
+    <section className="h-full w-full overflow-hidden rounded-[28px] border border-white/10 bg-[#121418]">
       <div className="relative flex h-full flex-col p-6">
         <div className="mb-4 grid grid-cols-2 gap-2">
           <div
             className={[
-              "rounded-xl border bg-black/25 px-3 py-2.5 text-center transition-colors",
+              "rounded-xl border bg-black/30 px-3 py-2.5 text-center",
               runningClock === "white" && !timeoutColor
-                ? "border-white/35 shadow-[0_0_18px_rgba(255,255,255,0.12)]"
+                ? "border-white/35"
                 : "border-white/10",
               timeoutColor === "white" ? "border-red-300/40 text-red-100" : "text-white/90",
             ]
@@ -173,9 +170,9 @@ export function WaitingRoomPanel({
           </div>
           <div
             className={[
-              "rounded-xl border bg-black/25 px-3 py-2.5 text-center transition-colors",
+              "rounded-xl border bg-black/30 px-3 py-2.5 text-center",
               runningClock === "black" && !timeoutColor
-                ? "border-white/35 shadow-[0_0_18px_rgba(255,255,255,0.12)]"
+                ? "border-white/35"
                 : "border-white/10",
               timeoutColor === "black" ? "border-red-300/40 text-red-100" : "text-white/72",
             ]
@@ -202,7 +199,7 @@ export function WaitingRoomPanel({
         <div className="mt-auto h-92 perspective-distant">
           <div
             className={[
-              "relative h-full w-full rounded-2xl border border-white/10 bg-[#111318]/70 transition-transform duration-700 transform-3d",
+              "relative h-full w-full rounded-2xl border border-white/10 bg-[#111318] transition-transform duration-700 transform-3d",
               showMatchFace ? "transform-[rotateY(180deg)]" : "",
             ]
               .filter(Boolean)
@@ -228,7 +225,7 @@ export function WaitingRoomPanel({
               <button
                 type="button"
                 aria-label={isMatching ? "queued" : isReady ? "unready" : "ready up"}
-                className="mx-auto block h-auto! rounded-xl bg-app-purple-strong px-8! py-4! text-4xl! font-bold! leading-none text-white shadow-[0_10px_28px_rgba(124,95,255,0.45)] hover:cursor-pointer disabled:cursor-not-allowed disabled:opacity-55"
+                className="mx-auto block h-auto! rounded-xl bg-app-purple-strong px-8! py-4! text-4xl! font-bold! leading-none text-white hover:cursor-pointer disabled:cursor-not-allowed disabled:opacity-55"
                 onClick={() => onToggleReady(selectedTimeControl)}
                 disabled={!canReady}
               >
@@ -245,7 +242,7 @@ export function WaitingRoomPanel({
                   <div className="flex items-center gap-2 text-sm font-medium tracking-[0.12em] text-white/80 lowercase">
                     <span
                       className={[
-                        "h-2.5 w-2.5 rounded-full shadow-[0_0_10px_rgba(255,255,255,0.35)]",
+                        "h-2.5 w-2.5 rounded-full",
                         gameStatus === "finished"
                           ? "bg-app-purple-soft/80"
                           : gameTurn === "white"
@@ -282,9 +279,8 @@ export function WaitingRoomPanel({
                         <div
                           key={row.moveNumber}
                           className={[
-                            "grid grid-cols-[42px_1fr_1fr] items-center gap-3 px-4 py-3 text-sm transition-colors",
+                            "grid grid-cols-[42px_1fr_1fr] items-center gap-3 px-4 py-3 text-sm",
                             index % 2 === 0 ? "bg-white/2.5" : "bg-transparent",
-                            "hover:bg-white/4",
                           ]
                             .filter(Boolean)
                             .join(" ")}
@@ -310,7 +306,7 @@ export function WaitingRoomPanel({
                     aria-label="resign"
                     onClick={onResign}
                     disabled={!canResign}
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-red-300/20 bg-red-300/8 text-red-100 transition hover:bg-red-300/15 disabled:cursor-not-allowed disabled:opacity-45"
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-red-300/20 bg-red-300/8 text-red-100 disabled:cursor-not-allowed disabled:opacity-45"
                   >
                     <Flag className="h-4 w-4" />
                   </button>
@@ -322,7 +318,7 @@ export function WaitingRoomPanel({
                         aria-label="accept draw"
                         onClick={onAcceptDraw}
                         disabled={!canAcceptDraw}
-                        className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-emerald-300/20 bg-emerald-300/8 text-emerald-100 transition hover:bg-emerald-300/15 disabled:cursor-not-allowed disabled:opacity-45"
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-emerald-300/20 bg-emerald-300/8 text-emerald-100 disabled:cursor-not-allowed disabled:opacity-45"
                       >
                         <Handshake className="h-4 w-4" />
                       </button>
@@ -331,7 +327,7 @@ export function WaitingRoomPanel({
                         aria-label="decline draw"
                         onClick={onDeclineDraw}
                         disabled={!canDeclineDraw}
-                        className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-white/15 bg-white/8 text-lg leading-none text-white/85 transition hover:bg-white/14 disabled:cursor-not-allowed disabled:opacity-45"
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-white/15 bg-white/8 text-lg leading-none text-white/85 disabled:cursor-not-allowed disabled:opacity-45"
                       >
                         ×
                       </button>
@@ -342,7 +338,7 @@ export function WaitingRoomPanel({
                       aria-label="offer draw"
                       onClick={onOfferDraw}
                       disabled={!canOfferDraw}
-                      className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-[#b8d7c2]/25 bg-[#b8d7c2]/10 text-[#d8f0df] transition hover:bg-[#b8d7c2]/18 disabled:cursor-not-allowed disabled:opacity-45"
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-[#b8d7c2]/25 bg-[#b8d7c2]/10 text-[#d8f0df] disabled:cursor-not-allowed disabled:opacity-45"
                     >
                       <Handshake className="h-4 w-4" />
                     </button>

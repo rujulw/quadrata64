@@ -36,6 +36,13 @@ const DEFAULT_GAME: GameSnapshot = {
 };
 
 const MATCH_WARMUP_MS = 1400;
+const CLOCK_TICK_MS = 100;
+
+function initialMsForControl(control: RoomSnapshot["timeControl"]): number {
+  if (control === "bullet") return 60_000;
+  if (control === "traditional") return 10 * 60_000;
+  return 3 * 60_000;
+}
 
 function formatResultLabel(game: GameSnapshot): string | null {
   if (game.status !== "finished" || !game.result) {
@@ -65,6 +72,7 @@ export default function PlayPage() {
     DEFAULT_ROOM.timeControl,
   );
   const [isMatchWarmup, setIsMatchWarmup] = useState(false);
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const warmupTimeoutRef = useRef<number | null>(null);
   const roomId = DEFAULT_ROOM.roomId;
 
@@ -115,7 +123,64 @@ export default function PlayPage() {
   const canReady = Boolean(currentSeat);
   const isMatching = (isReady && room.phase === "waiting") || isMatchWarmup;
   const terminalResultLabel = formatResultLabel(game);
-  const canGameActions = Boolean(currentSeat) && room.phase === "active" && game.status === "active";
+  const isLiveGame = room.phase === "active" && syncedGame !== null;
+
+  useEffect(() => {
+    if (!isLiveGame || game.status !== "active" || game.timer.runningFor === null) {
+      return;
+    }
+    const interval = window.setInterval(() => {
+      setNowMs(Date.now());
+    }, CLOCK_TICK_MS);
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, [isLiveGame, game.status, game.timer.runningFor]);
+
+  const clockState = (() => {
+    if (!isLiveGame) {
+      const initialMs = initialMsForControl(selectedTimeControl);
+      return {
+        whiteMs: initialMs,
+        blackMs: initialMs,
+        runningFor: null as GameSnapshot["timer"]["runningFor"],
+      };
+    }
+
+    const timer = game.timer;
+    if (game.status !== "active" || timer.runningFor === null) {
+      return {
+        whiteMs: timer.whiteMs,
+        blackMs: timer.blackMs,
+        runningFor: timer.runningFor,
+      };
+    }
+
+    const elapsedMs = Math.max(0, nowMs - timer.updatedAt);
+    if (timer.runningFor === "white") {
+      return {
+        whiteMs: Math.max(0, timer.whiteMs - elapsedMs),
+        blackMs: timer.blackMs,
+        runningFor: timer.runningFor,
+      };
+    }
+    return {
+      whiteMs: timer.whiteMs,
+      blackMs: Math.max(0, timer.blackMs - elapsedMs),
+      runningFor: timer.runningFor,
+    };
+  })();
+
+  const timeoutColor =
+    room.phase === "active" && game.status === "active"
+      ? clockState.whiteMs <= 0
+        ? "white"
+        : clockState.blackMs <= 0
+          ? "black"
+          : null
+      : null;
+  const canGameActions =
+    Boolean(currentSeat) && room.phase === "active" && game.status === "active" && !timeoutColor;
   const canOfferDraw = canGameActions && !game.drawOfferBy;
   const canRespondToDraw =
     canGameActions && Boolean(game.drawOfferBy) && game.drawOfferBy !== currentPlayerColor;
@@ -199,6 +264,10 @@ export default function PlayPage() {
               canAcceptDraw={canRespondToDraw}
               canDeclineDraw={canRespondToDraw}
               selectedTimeControl={selectedTimeControl}
+              whiteClockMs={clockState.whiteMs}
+              blackClockMs={clockState.blackMs}
+              runningClock={clockState.runningFor}
+              timeoutColor={timeoutColor}
               onTimeControlChange={setSelectedTimeControl}
               onToggleReady={handleToggleReady}
               onResign={() => dispatchResignIntent(room.roomId, playerId)}
@@ -212,7 +281,7 @@ export default function PlayPage() {
             <BoardSurface
               snapshot={game}
               orientation={orientation}
-              playerColor={currentPlayerColor}
+              playerColor={timeoutColor ? null : currentPlayerColor}
               onMoveIntent={(move) => dispatchMoveIntent(room.roomId, playerId, move)}
             />
           </div>

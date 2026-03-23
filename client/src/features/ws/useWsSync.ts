@@ -98,7 +98,26 @@ function mapServerRoomToSnapshot(room: ServerRoomContract): RoomSnapshot {
   };
 }
 
-function mapServerGameSnapshot(payload: unknown): GameSnapshot | null {
+function projectTimerFromPrevious(
+  previous: GameSnapshot["timer"],
+  nextRunningFor: GameSnapshot["turn"],
+): GameSnapshot["timer"] {
+  const now = Date.now();
+  const elapsedMs = Math.max(0, now - previous.updatedAt);
+  const whiteMs =
+    previous.runningFor === "white" ? Math.max(0, previous.whiteMs - elapsedMs) : previous.whiteMs;
+  const blackMs =
+    previous.runningFor === "black" ? Math.max(0, previous.blackMs - elapsedMs) : previous.blackMs;
+
+  return {
+    whiteMs,
+    blackMs,
+    runningFor: nextRunningFor,
+    updatedAt: now,
+  };
+}
+
+function mapServerGameSnapshot(payload: unknown, previousGame: GameSnapshot | null): GameSnapshot | null {
   if (!isRecord(payload)) return null;
 
   const snapshot = isRecord(payload.snapshot) ? payload.snapshot : null;
@@ -150,7 +169,7 @@ function mapServerGameSnapshot(payload: unknown): GameSnapshot | null {
               ? snapshot.timeControl.incrementMs
               : 0,
         }
-      : {
+      : previousGame?.timeControl ?? {
           id: "rapid" as const,
           initialMs: 180_000,
           incrementMs: 0,
@@ -174,12 +193,14 @@ function mapServerGameSnapshot(payload: unknown): GameSnapshot | null {
               ? snapshot.timer.updatedAt
               : Date.now(),
         }
-      : {
-          whiteMs: timeControl.initialMs,
-          blackMs: timeControl.initialMs,
-          runningFor: turn,
-          updatedAt: Date.now(),
-        };
+      : previousGame
+        ? projectTimerFromPrevious(previousGame.timer, turn)
+        : {
+            whiteMs: timeControl.initialMs,
+            blackMs: timeControl.initialMs,
+            runningFor: turn,
+            updatedAt: Date.now(),
+          };
 
   return { fen, turn, status, moveCount, timeControl, timer, drawOfferBy, lastMove, result };
 }
@@ -301,8 +322,12 @@ export function useWsSync(config: SyncConfig): SyncState & SyncActions {
         parsed.type === "draw_offered" ||
         parsed.type === "draw_declined"
       ) {
-        const mappedGame = mapServerGameSnapshot(parsed.payload);
-        if (mappedGame) {
+        setState((prev) => {
+          const mappedGame = mapServerGameSnapshot(parsed.payload, prev.game);
+          if (!mappedGame) {
+            return prev;
+          }
+
           if (parsed.type === "init_game") {
             const feedChess = new Chess();
             try {
@@ -313,13 +338,13 @@ export function useWsSync(config: SyncConfig): SyncState & SyncActions {
             }
           }
 
-          setState((prev) => ({
+          return {
             ...prev,
             game: mappedGame,
             moveFeed: parsed.type === "init_game" ? [] : prev.moveFeed,
             errorMessage: null,
-          }));
-        }
+          };
+        });
 
         if (parsed.type === "move_applied") {
           let sanNotation: string | null = null;

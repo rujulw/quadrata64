@@ -1,7 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
-import { DottedMap } from "../components/ui/dotted-map";
-import { BoardSurface, type GameSnapshot } from "../features/board";
+import { BoardSurface, type GameSnapshot, type MoveIntent } from "../features/board";
 import { WaitingRoomPanel, type RoomSnapshot } from "../features/room";
 import { useWsSync } from "../features/ws";
 
@@ -185,6 +184,14 @@ export default function PlayPage() {
   const canRespondToDraw =
     canGameActions && Boolean(game.drawOfferBy) && game.drawOfferBy !== currentPlayerColor;
   const drawOfferLabel = game.drawOfferBy ? `${game.drawOfferBy} offered draw` : null;
+  const boardPlayerColor = timeoutColor ? null : currentPlayerColor;
+
+  const handleMoveIntent = useCallback(
+    (move: MoveIntent) => {
+      dispatchMoveIntent(room.roomId, playerId, move);
+    },
+    [dispatchMoveIntent, room.roomId, playerId],
+  );
 
   useEffect(() => {
     return () => {
@@ -239,13 +246,7 @@ export default function PlayPage() {
   };
 
   return (
-    <section className="relative min-h-screen overflow-hidden">
-      <DottedMap
-        className="pointer-events-none absolute inset-0 text-[#d5d8df] opacity-45 blur-[1px] mask-[radial-gradient(circle_at_50%_40%,white_30%,transparent_82%)]"
-        markers={[]}
-        dotRadius={0.18}
-      />
-
+    <section className="min-h-screen bg-black">
       <div className="relative mx-auto w-full max-w-365 px-6 py-6 sm:px-8 lg:px-12">
         <div className="grid min-h-[78vh] gap-4 lg:h-[calc(100vh-165px)] lg:grid-cols-[minmax(320px,40%)_minmax(0,60%)] lg:items-stretch lg:gap-4">
           <div className="h-full">
@@ -281,8 +282,8 @@ export default function PlayPage() {
             <BoardSurface
               snapshot={game}
               orientation={orientation}
-              playerColor={timeoutColor ? null : currentPlayerColor}
-              onMoveIntent={(move) => dispatchMoveIntent(room.roomId, playerId, move)}
+              playerColor={boardPlayerColor}
+              onMoveIntent={handleMoveIntent}
             />
           </div>
         </div>

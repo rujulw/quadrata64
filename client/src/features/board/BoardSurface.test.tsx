@@ -255,6 +255,52 @@ describe("BoardSurface", () => {
     expect(container.querySelector('img[aria-hidden="true"]')).not.toBeNull();
   });
 
+  it("expands the piece on press and hold before drag threshold is crossed", () => {
+    render(
+      <BoardSurface
+        snapshot={makeSnapshot()}
+        orientation="white"
+        playerColor="white"
+        onMoveIntent={vi.fn()}
+      />,
+    );
+
+    const from = screen.getByRole("button", { name: "e2" });
+    const piece = within(from).getByRole("img", { name: "white p" });
+
+    fireEvent.pointerDown(piece, { button: 0, pointerId: 1, clientX: 20, clientY: 20, isPrimary: true });
+
+    expect(piece.className).toContain("scale-[1.12]");
+    expect(piece.className).not.toContain("opacity-0");
+  });
+
+  it("renders darker green legal move dots and square drop highlight styling", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <BoardSurface
+        snapshot={makeSnapshot()}
+        orientation="white"
+        playerColor="white"
+        onMoveIntent={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "e2" }));
+
+    const legalDot = screen.getByRole("button", { name: "e4" }).querySelector(".bg-\\[\\#5f9d73\\]\\/90");
+    expect(legalDot).not.toBeNull();
+
+    const piece = within(screen.getByRole("button", { name: "e2" })).getByRole("img", { name: "white p" });
+    const targetSquare = screen.getByRole("button", { name: "e4" });
+    fireEvent.pointerDown(piece, { button: 0, pointerId: 1, clientX: 20, clientY: 20, isPrimary: true });
+    fireEvent.pointerMove(window, { pointerId: 1, clientX: 30, clientY: 30 });
+    fireEvent.mouseEnter(targetSquare);
+
+    const hoverHighlight = targetSquare.querySelector(".ring-\\[3px\\]");
+    expect(hoverHighlight).not.toBeNull();
+  });
+
   it("handles promotion path with queen promotion intent", async () => {
     const onMoveIntent = vi.fn();
     const user = userEvent.setup();

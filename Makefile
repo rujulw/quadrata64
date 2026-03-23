@@ -1,4 +1,4 @@
-.PHONY: setup dev dev-server dev-client build build-server build-client start lint typecheck clean
+.PHONY: setup dev dev-server dev-client build build-server build-client start lint typecheck clean docker-up docker-down docker-build docker-logs
 
 setup:
 	cd server && npm install
@@ -34,3 +34,15 @@ typecheck:
 
 clean:
 	rm -rf server/dist client/dist
+
+docker-build:
+	docker compose build
+
+docker-up:
+	docker compose up --build
+
+docker-down:
+	docker compose down
+
+docker-logs:
+	docker compose logs -f

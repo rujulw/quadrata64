@@ -47,23 +47,45 @@ npm run dev
 Frontend default: `http://localhost:5173`  
 WebSocket server default: `ws://localhost:3000`
 
+## Docker Workflow
+
+### 1. Optional env setup
+```bash
+cp .env.example .env
+```
+
+Defaults:
+- `SERVER_PORT=3000`
+- `CLIENT_PORT=5173`
+- `VITE_WS_URL=ws://localhost:3000`
+
+### 2. Start the full system
+```bash
+make docker-up
+```
+
+### 3. Stop the full system
+```bash
+make docker-down
+```
+
+Useful extras:
+```bash
+make docker-build
+make docker-logs
+```
+
 ## Environment Variables
 
-### Server (`server/.env`)
-- `PORT=3000`
-- `CLIENT_URL=http://localhost:5173`
-
-### Client (`client/.env`)
+### Root (`.env`)
+- `SERVER_PORT=3000`
+- `CLIENT_PORT=5173`
 - `VITE_WS_URL=ws://localhost:3000`
 
 ## Known Gaps
 - No matchmaking system yet (manual room pairing).
 - No persistent game storage.
-- No server-enforced clock / time control implementation yet (client selector only).
 - No end-to-end multiplayer test suite yet.
-- No resign/draw controls yet.
-- No drag-and-drop board interaction yet.
-- No client-side planning arrows yet.
 
 ## Development Workflow
 - Branch naming: `feat/<branch-name>`

@@ -6,9 +6,9 @@ services:
       target: dev
     container_name: quadrata64-server
     environment:
-      PORT: 3000
+      PORT: ${SERVER_PORT:-3000}
     ports:
-      - "3000:3000"
+      - "${SERVER_PORT:-3000}:3000"
     volumes:
       - ./server:/app
       - server_node_modules:/app/node_modules
@@ -22,9 +22,9 @@ services:
     depends_on:
       - server
     environment:
-      VITE_WS_URL: ws://localhost:3000
+      VITE_WS_URL: ${VITE_WS_URL:-ws://localhost:3000}
     ports:
-      - "5173:5173"
+      - "${CLIENT_PORT:-5173}:5173"
     volumes:
       - ./client:/app
       - client_node_modules:/app/node_modules

@@ -258,3 +258,54 @@ Why:
 Impact:
 - Added `server/src/game/GameEngine.test.ts`.
 - Added `server` `npm run test` script (`build` + `node --test`).
+
+---
+
+## 16. Server-Authoritative Time Control and Timer State
+
+Decision:
+Model time control presets and per-side remaining clock directly in server game snapshots.
+
+Why:
+- Keeps timeout and increment behavior authoritative instead of trusting client timers.
+- Makes reconnect and partial snapshot recovery possible from a consistent timer contract.
+- Lets client UI render clocks without inventing game-state rules locally.
+
+Impact:
+- `GameEngine` now owns `timeControl` and `timer` state and resolves timeout as a terminal result.
+- Room readiness carries selected time-control choice into active game creation.
+- Client sync and panel/board UI consume authoritative timer fields rather than static defaults alone.
+
+---
+
+## 17. Pointer-Captured Drag Interaction with Thresholded Lift
+
+Decision:
+Move board dragging onto pointer events with pointer capture, a drag threshold, and a ref-driven preview layer.
+
+Why:
+- Produces a more reliable drag model across devices than window-scoped mouse events.
+- Separates press-and-hold piece lift from full drag activation so click-to-move and drag-to-move coexist cleanly.
+- Reduces hot-path render churn by keeping live drag position in refs and syncing preview motion per animation frame.
+
+Impact:
+- `BoardSurface` now starts drag on `pointerdown`, captures the pointer, and finalizes drop from pointer-location hit testing.
+- Drag preview keeps the original grab offset and piece bounds so pickup feels attached to the cursor.
+- Board tests now cover threshold crossing, press-and-hold expansion, legal target styling, and drag-drop behavior.
+
+---
+
+## 18. Lightweight Play Surface over Atmospheric Landing Surface
+
+Decision:
+Keep the richer visual atmosphere on the landing page, but simplify `/play` so active gameplay prioritizes responsiveness.
+
+Why:
+- Background map effects, heavy glassmorphism, and long-lived 3D treatment make interaction regressions harder to read.
+- Active gameplay benefits more from stable input latency than decorative motion.
+- The match-found loader/flip is a meaningful transition, but ongoing play should settle into a simpler shell.
+
+Impact:
+- Removed the dotted-map background from `PlayPage` while preserving the landing-page atmosphere.
+- Restored the waiting-state loader and match-found flip path in `WaitingRoomPanel`.
+- Simplified active panel treatment while keeping clock, move feed, and action controls intact.

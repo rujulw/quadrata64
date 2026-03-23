@@ -8,9 +8,12 @@ Current model:
 - typed websocket protocol boundary
 - waiting-room lifecycle with readiness-based activation
 - per-session game registry and deterministic terminal-state broadcasts
+- authoritative time-control presets and per-side timer state
 - full-bleed landing UI with motion, spotlight lighting, and dotted-map atmosphere
 - live client waiting-room sync on `/play` (join + room-state hydration + ready toggle dispatch)
 - interactive board move intent flow with legal-target guidance
+- pointer-driven drag-and-drop piece interaction with thresholded lift and captured drag preview
+- client-side timeout lockout and synchronized board/side-panel clock display
 - gameplay side panel with move feed, turn indicator, and terminal result surfacing
 
 ## Repository Structure
@@ -37,6 +40,8 @@ Target responsibilities:
 - compose feature modules in route pages (`src/pages/PlayPage.tsx`) without cross-feature coupling
 - persist tab-scoped transport identity (`sessionStorage`) for multi-tab room testing
 - maintain move feed state from authoritative move events with SAN notation fallback
+- project timer continuity across partial snapshots and reconnect-style `init_game` hydration
+- keep `/play` presentation lighter than landing page so active gameplay avoids unnecessary atmosphere effects
 - run client coverage via Vitest + Testing Library:
 - `src/features/room/WaitingRoomPanel.test.tsx`
 - `src/features/board/BoardSurface.test.tsx`
@@ -51,6 +56,7 @@ Current responsibilities:
 - enforce session preconditions with typed error responses
 - maintain active game registry via `src/game/GameManager.ts`
 - apply authoritative chess moves via `src/game/GameEngine.ts`
+- own authoritative time-control config and timer consumption/increment behavior in game-core
 
 Game-core responsibilities:
 - own typed game domain contracts in `src/game/types.ts`
@@ -81,6 +87,7 @@ Game-core responsibilities:
 - validates socket ownership and payload boundary
 - rejects if room is not active
 - applies move through game engine for active rooms
+- consumes active-side clock before move application and resolves timeout as a terminal result
 - broadcasts `move_applied` with authoritative snapshot
 - emits `game_over` with structured result on terminal state
 - rejects subsequent moves for finished games
@@ -113,16 +120,16 @@ Current outbound types:
 - `init_game`
 - `move_applied`
 - `game_over`
+- `draw_offered`
+- `draw_declined`
 - `error`
 
 ## Known Gaps
 - No persistence across server restarts.
 - No reconnect/session recovery path.
 - No end-to-end multiplayer integration test suite.
-- No server-enforced clocks/time controls yet.
-- No draw/resign workflow yet.
-- No drag-and-drop piece interaction yet.
-- No client-side planning arrows yet.
+- No persistence for completed game history/move archives.
+- No profiler-guided production performance pass on `/play`.
 
 ## Environment Variables
 ### Server

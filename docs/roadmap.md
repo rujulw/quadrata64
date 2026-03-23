@@ -30,6 +30,11 @@ Port the older websocket chess prototype into a typed, server-authoritative sess
 - [x] side-panel game telemetry (turn indicator, move feed, terminal result label)
 - [x] websocket move-feed synchronization with SAN notation fallback
 - [x] backend engine regression tests (`node:test`) for move payload/result contracts
+- [x] draw/resign workflow (protocol + server handling + client controls)
+- [x] client-side planning arrows via right-click interactions
+- [x] authoritative time controls and synchronized clock UI
+- [x] pointer-driven drag-and-drop interaction with captured preview and thresholded lift
+- [x] timer drift / timeout / increment regression coverage across reconnect and turn changes
 
 ## 1. Complete Current Branch (Final Impl + Docs)
 - [x] Implement move application path behind active-session gate.
@@ -39,12 +44,10 @@ Port the older websocket chess prototype into a typed, server-authoritative sess
 - [x] Finalize consolidated docs sync (design + bug-log + roadmap + architecture).
 
 ## Next Milestones (Immediate)
-- PR current gameplay UI + sync baseline into `development` after regression pass.
-- Add draw/resign workflow (protocol + server handling + client controls).
-- Add drag-and-drop piece interaction constrained to legal destinations.
-- Add client-side planning arrows via right-click interactions.
-- Implement authoritative time controls and synchronized clock UI.
+- Merge completed time-control branch into `development`.
+- Continue gameplay-feel work on pointer drag polish and render-cost reduction for `/play`.
 - Expand server test coverage for router/session integration paths.
+- Decide on persistence scope for completed game history and move archives.
 
 ## 2. Post-MVP Hardening
 - Add reconnection strategy for transient disconnects.
@@ -60,5 +63,4 @@ Port the older websocket chess prototype into a typed, server-authoritative sess
 ## 4. Product Layer
 - Add optional matchmaking queue.
 - Add persistence for completed games/history.
-- Add time controls and clock synchronization.
 - Continue gameplay UX polish until production release quality is reached.

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { GAME_ENGINE_ERRORS, GameEngine } from "./GameEngine";
+import { TIME_CONTROL_PRESETS } from "./timeControls";
 
 describe("GameEngine", () => {
   it("includes move payload fields and lastMove in snapshot after applyMove", () => {
@@ -198,5 +199,90 @@ describe("GameEngine", () => {
     assert.equal(moveResult.ok, true);
     if (!moveResult.ok) return;
     assert.equal(moveResult.data.snapshot.drawOfferBy, null);
+  });
+
+  it("concludes the game with a timeout result before applying an overdue move", () => {
+    const originalNow = Date.now;
+
+    try {
+      Date.now = () => 1_000;
+      const engine = GameEngine.create({
+        gameId: "g-11",
+        sessionId: "room-11",
+        players: { white: "w-11", black: "b-11" },
+        timeControlId: "bullet",
+      });
+
+      Date.now = () => 61_500;
+      const applied = engine.applyMove({
+        playerId: "w-11",
+        move: { from: "e2", to: "e4" },
+      });
+
+      assert.equal(applied.ok, true);
+      if (!applied.ok) return;
+
+      assert.equal(applied.data.gameOver, true);
+      assert.equal(applied.data.snapshot.moveCount, 0);
+      assert.equal(applied.data.snapshot.status, "finished");
+      assert.equal(applied.data.snapshot.timer.whiteMs, 0);
+      assert.equal(applied.data.snapshot.timer.runningFor, null);
+      assert.deepEqual(applied.data.result, {
+        winnerColor: "black",
+        reason: "timeout",
+      });
+    } finally {
+      Date.now = originalNow;
+    }
+  });
+
+  it("applies increment to the mover and hands the running clock to the opponent", () => {
+    const originalNow = Date.now;
+    const originalBulletIncrement = TIME_CONTROL_PRESETS.bullet.incrementMs;
+
+    try {
+      TIME_CONTROL_PRESETS.bullet.incrementMs = 2_000;
+      Date.now = () => 2_000;
+
+      const engine = GameEngine.create({
+        gameId: "g-12",
+        sessionId: "room-12",
+        players: { white: "w-12", black: "b-12" },
+        timeControlId: "bullet",
+      });
+
+      Date.now = () => 5_000;
+      const whiteMove = engine.applyMove({
+        playerId: "w-12",
+        move: { from: "e2", to: "e4" },
+      });
+
+      assert.equal(whiteMove.ok, true);
+      if (!whiteMove.ok) return;
+
+      assert.equal(whiteMove.data.snapshot.turn, "black");
+      assert.equal(whiteMove.data.snapshot.timer.whiteMs, 59_000);
+      assert.equal(whiteMove.data.snapshot.timer.blackMs, 60_000);
+      assert.equal(whiteMove.data.snapshot.timer.runningFor, "black");
+      assert.equal(whiteMove.data.snapshot.timer.updatedAt, 5_000);
+
+      Date.now = () => 8_000;
+      const blackMove = engine.applyMove({
+        playerId: "b-12",
+        move: { from: "e7", to: "e5" },
+      });
+
+      assert.equal(blackMove.ok, true);
+      if (!blackMove.ok) return;
+
+      assert.equal(blackMove.data.snapshot.turn, "white");
+      assert.equal(blackMove.data.snapshot.timer.whiteMs, 59_000);
+      assert.equal(blackMove.data.snapshot.timer.blackMs, 59_000);
+      assert.equal(blackMove.data.snapshot.timer.runningFor, "white");
+      assert.equal(blackMove.data.snapshot.timer.updatedAt, 8_000);
+    } finally {
+      TIME_CONTROL_PRESETS.bullet.incrementMs = originalBulletIncrement;
+      Date.now = originalNow;
+    }
   });
 });

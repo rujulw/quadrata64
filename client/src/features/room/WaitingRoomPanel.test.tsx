@@ -12,6 +12,10 @@ const baseProps = {
   onAcceptDraw: vi.fn(),
   onDeclineDraw: vi.fn(),
   selectedTimeControl: "rapid" as const,
+  whiteClockMs: 180_000,
+  blackClockMs: 180_000,
+  runningClock: null,
+  timeoutColor: null,
 };
 
 describe("WaitingRoomPanel", () => {
@@ -221,5 +225,34 @@ describe("WaitingRoomPanel", () => {
     expect(screen.queryByRole("button", { name: "offer draw" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "accept draw" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "decline draw" })).toBeEnabled();
+  });
+
+  it("renders live clocks and timeout status copy", () => {
+    render(
+      <WaitingRoomPanel
+        {...baseProps}
+        whiteClockMs={0}
+        blackClockMs={130_000}
+        runningClock={null}
+        timeoutColor="white"
+        isMatching={false}
+        isReady
+        canReady
+        canResign={false}
+        canOfferDraw={false}
+        canAcceptDraw={false}
+        canDeclineDraw={false}
+        roomPhase="active"
+        gameTurn="black"
+        gameStatus="active"
+        terminalResultLabel={null}
+        drawOfferLabel={null}
+        moveFeed={[]}
+      />,
+    );
+
+    expect(screen.getByText("0:00")).toBeInTheDocument();
+    expect(screen.getByText("2:10")).toBeInTheDocument();
+    expect(screen.getByText("white out of time")).toBeInTheDocument();
   });
 });

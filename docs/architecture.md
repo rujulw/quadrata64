@@ -19,6 +19,7 @@ Current model:
 ## Repository Structure
 - `client/`: React app (Vite), board UI, websocket client integration.
 - `server/`: websocket server, protocol validation, room/session lifecycle.
+- `docker/`: container build definitions for client and server images.
 - `server/src/ws/`: websocket router + payload/envelope validators.
 - `docs/`: design decisions, roadmap, architecture, and bug history.
 
@@ -42,6 +43,7 @@ Target responsibilities:
 - maintain move feed state from authoritative move events with SAN notation fallback
 - project timer continuity across partial snapshots and reconnect-style `init_game` hydration
 - keep `/play` presentation lighter than landing page so active gameplay avoids unnecessary atmosphere effects
+- support root-level containerized startup via compose and `VITE_WS_URL` environment injection
 - run client coverage via Vitest + Testing Library:
 - `src/features/room/WaitingRoomPanel.test.tsx`
 - `src/features/board/BoardSurface.test.tsx`
@@ -57,6 +59,7 @@ Current responsibilities:
 - maintain active game registry via `src/game/GameManager.ts`
 - apply authoritative chess moves via `src/game/GameEngine.ts`
 - own authoritative time-control config and timer consumption/increment behavior in game-core
+- expose websocket service cleanly to local container orchestration through environment-based port binding
 
 Game-core responsibilities:
 - own typed game domain contracts in `src/game/types.ts`
@@ -132,6 +135,11 @@ Current outbound types:
 - No profiler-guided production performance pass on `/play`.
 
 ## Environment Variables
+### Root / Compose
+- `SERVER_PORT` (default `3000`)
+- `CLIENT_PORT` (default `5173`)
+- `VITE_WS_URL` (default `ws://localhost:3000`)
+
 ### Server
 - `PORT` (default `3000`)
 
@@ -143,6 +151,10 @@ Current outbound types:
 - `make dev`
 - `make build`
 - `make typecheck`
+- `make docker-build`
+- `make docker-up`
+- `make docker-down`
+- `make docker-logs`
 - `cd client && npm run test`
 - `cd client && npm run test:run`
 - `cd server && npm run test`

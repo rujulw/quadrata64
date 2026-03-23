@@ -35,6 +35,8 @@ Port the older websocket chess prototype into a typed, server-authoritative sess
 - [x] authoritative time controls and synchronized clock UI
 - [x] pointer-driven drag-and-drop interaction with captured preview and thresholded lift
 - [x] timer drift / timeout / increment regression coverage across reconnect and turn changes
+- [x] root compose-based Docker workflow with separate client/server images
+- [x] container startup docs, env wiring, and Makefile Docker helpers
 
 ## 1. Complete Current Branch (Final Impl + Docs)
 - [x] Implement move application path behind active-session gate.
@@ -46,6 +48,7 @@ Port the older websocket chess prototype into a typed, server-authoritative sess
 ## Next Milestones (Immediate)
 - Merge completed time-control branch into `development`.
 - Continue gameplay-feel work on pointer drag polish and render-cost reduction for `/play`.
+- Add CI pipeline gates for client/server build, typecheck, and test flows.
 - Expand server test coverage for router/session integration paths.
 - Decide on persistence scope for completed game history and move archives.
 

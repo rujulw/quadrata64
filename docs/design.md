@@ -309,3 +309,20 @@ Impact:
 - Removed the dotted-map background from `PlayPage` while preserving the landing-page atmosphere.
 - Restored the waiting-state loader and match-found flip path in `WaitingRoomPanel`.
 - Simplified active panel treatment while keeping clock, move feed, and action controls intact.
+
+---
+
+## 19. Root-Level Compose Workflow over Per-Service Manual Startup
+
+Decision:
+Containerize the client and server as one root-managed system using a shared `compose.yml`, while keeping separate service images and Dockerfiles.
+
+Why:
+- Matches the repo’s monorepo structure without forcing client and server into an unnatural single-image runtime.
+- Gives local development one top-level startup flow (`make docker-up`) instead of separate per-service container commands.
+- Keeps image concerns explicit: Vite client and websocket server have different dependencies, ports, and production runtimes.
+
+Impact:
+- Added `docker/Dockerfile.client` and `docker/Dockerfile.server` with dev/build/production stages.
+- Added root `compose.yml` and Makefile targets for `docker-build`, `docker-up`, `docker-down`, and `docker-logs`.
+- Added root `.env.example` and compose env wiring for `SERVER_PORT`, `CLIENT_PORT`, and `VITE_WS_URL`.

@@ -1,5 +1,13 @@
 # Bug Log
 
+## 2026-03-23 — Local container startup lacked a single root workflow and env contract
+- Symptom: Dockerization existed as separate service build definitions but did not yet provide one coherent repo-root startup flow or a shared environment contract.
+- Root cause: Initial container work focused on image/build scaffolding before root compose ergonomics, startup commands, and env wiring were finalized.
+- Fix: Added root-level compose orchestration, Makefile Docker helpers, `.env.example`, and image/runtime cleanup so the system can be started from the main directory as one containerized stack.
+- Files: `compose.yml`, `docker/Dockerfile.client`, `docker/Dockerfile.server`, `Makefile`, `README.md`, `.env.example`
+
+---
+
 ## 2026-03-23 — Play screen atmosphere and dev-mode overhead masked board interaction performance
 - Symptom: Piece dragging, panel motion, and general UI responsiveness felt broadly choppy on `/play`, especially while connected to a live game.
 - Root cause: The play route was carrying expensive atmosphere/render work (full-screen dotted map, clock-driven rerenders, heavier panel treatment) while local development was also running under React StrictMode.

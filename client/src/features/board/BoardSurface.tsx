@@ -42,6 +42,7 @@ type BoardCellProps = {
   square: string;
   isLight: boolean;
   isSelected: boolean;
+  isLastMoveSquare: boolean;
   isLegalTarget: boolean;
   isHoveredLegalTarget: boolean;
   isPlaceTarget: boolean;
@@ -66,6 +67,7 @@ const BoardCell = memo(function BoardCell({
   square,
   isLight,
   isSelected,
+  isLastMoveSquare,
   isLegalTarget,
   isHoveredLegalTarget,
   isPlaceTarget,
@@ -93,12 +95,18 @@ const BoardCell = memo(function BoardCell({
       className={[
         "relative aspect-square",
         isLight ? "bg-neutral-200" : "bg-board-dark",
-        isSelected ? "outline-2 -outline-offset-2 outline-app-purple-strong" : "",
+        isSelected ? "ring-[3px] ring-inset ring-app-purple-strong" : "",
         isPlaceTarget ? "cursor-grab" : "cursor-default",
       ]
         .filter(Boolean)
         .join(" ")}
     >
+      {isLastMoveSquare ? (
+        <span
+          data-last-move-square={square}
+          className="pointer-events-none absolute inset-0 bg-[#c9a44b]/28"
+        />
+      ) : null}
       {isDraggingSource && isDraggingVisual && isLegalTarget ? (
         <span className="pointer-events-none absolute inset-[5%] rounded-[18%] bg-[#8fcea2]/7 ring-1 ring-inset ring-[#8fcea2]/35" />
       ) : null}
@@ -110,6 +118,9 @@ const BoardCell = memo(function BoardCell({
       ) : null}
       {isHoveredLegalTarget ? (
         <span className="pointer-events-none absolute inset-0 ring-[3px] ring-inset ring-[#8fcea2]/80" />
+      ) : null}
+      {isSelected ? (
+        <span className="pointer-events-none absolute inset-[8%] rounded-[10%] border border-app-purple-soft/65" />
       ) : null}
 
       {piece ? (
@@ -339,6 +350,12 @@ export const BoardSurface = memo(function BoardSurface({
     Boolean(playerColor) &&
     snapshot.turn === playerColor &&
     optimisticFen === null;
+  const lastMoveSquares = useMemo(() => {
+    if (!snapshot.lastMove) {
+      return new Set<string>();
+    }
+    return new Set([snapshot.lastMove.from, snapshot.lastMove.to]);
+  }, [snapshot.lastMove]);
   const ownedColor = playerColor === "white" ? "w" : "b";
   const draggedPiece = draggedPiecePreview;
   const planningHighlightSet = useMemo(() => new Set(planningHighlights), [planningHighlights]);
@@ -782,6 +799,7 @@ export const BoardSurface = memo(function BoardSurface({
         square={square}
         isLight={isLightSquare(square)}
         isSelected={selectedSquare === square}
+        isLastMoveSquare={lastMoveSquares.has(square)}
         isLegalTarget={legalTargets.has(square)}
         isHoveredLegalTarget={
           hoveredDropSquare === square && draggedSquare !== null && legalTargets.has(square)

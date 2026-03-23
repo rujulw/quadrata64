@@ -30,6 +30,14 @@ function makeSnapshot(fen: string = START_FEN) {
   };
 }
 
+function makeSnapshotWithLastMove(lastMove: { from: string; to: string }) {
+  return {
+    ...makeSnapshot(),
+    moveCount: 1,
+    lastMove,
+  };
+}
+
 function drawPlanningArrow(from: string, to: string) {
   const fromSquare = screen.getByRole("button", { name: from });
   const toSquare = screen.getByRole("button", { name: to });
@@ -72,6 +80,20 @@ describe("BoardSurface", () => {
     expect(onMoveIntent).toHaveBeenCalledWith({ from: "e2", to: "e4", promotion: undefined });
   });
 
+  it("highlights the last move source and destination squares", () => {
+    render(
+      <BoardSurface
+        snapshot={makeSnapshotWithLastMove({ from: "e2", to: "e4" })}
+        orientation="white"
+        playerColor="white"
+        onMoveIntent={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "e2" }).querySelector('[data-last-move-square="e2"]')).not.toBeNull();
+    expect(screen.getByRole("button", { name: "e4" }).querySelector('[data-last-move-square="e4"]')).not.toBeNull();
+  });
+
   it("does not dispatch when destination is illegal", async () => {
     const onMoveIntent = vi.fn();
     const user = userEvent.setup();
@@ -89,6 +111,25 @@ describe("BoardSurface", () => {
     await user.click(screen.getByRole("button", { name: "e5" }));
 
     expect(onMoveIntent).not.toHaveBeenCalled();
+  });
+
+  it("adds stronger active-square cues when a piece is selected", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <BoardSurface
+        snapshot={makeSnapshot()}
+        orientation="white"
+        playerColor="white"
+        onMoveIntent={vi.fn()}
+      />,
+    );
+
+    const sourceSquare = screen.getByRole("button", { name: "e2" });
+    await user.click(sourceSquare);
+
+    expect(sourceSquare.className).toContain("ring-[3px]");
+    expect(sourceSquare.querySelector(".border-app-purple-soft\\/65")).not.toBeNull();
   });
 
   it("dispatches move intent when piece is dragged to a legal square", () => {

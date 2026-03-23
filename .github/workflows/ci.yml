@@ -8,6 +8,10 @@ on:
     branches:
       - development
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   client:
     name: Client Checks
@@ -25,6 +29,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: npm
+          cache-dependency-path: client/package-lock.json
 
       - name: Install dependencies
         run: npm ci
@@ -54,6 +60,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: npm
+          cache-dependency-path: server/package-lock.json
 
       - name: Install dependencies
         run: npm ci
@@ -63,3 +71,20 @@ jobs:
 
       - name: Test
         run: npm run test
+
+      - name: Build
+        run: npm run build
+
+  docker:
+    name: Docker Build Checks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build client image
+        run: docker build -f docker/Dockerfile.client --target production .
+
+      - name: Build server image
+        run: docker build -f docker/Dockerfile.server --target production .

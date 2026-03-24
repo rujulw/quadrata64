@@ -23,6 +23,11 @@ type PlanningArrow = {
   to: string;
 };
 
+type LegalMoveMap = {
+  targets: Set<string>;
+  captures: Set<string>;
+};
+
 const PIECE_SYMBOLS: Record<`${BoardPiece["color"]}${BoardPiece["type"]}`, string> = {
   wp: "/piece/cburnett/wP.svg",
   wn: "/piece/cburnett/wN.svg",
@@ -44,6 +49,7 @@ type BoardCellProps = {
   isSelected: boolean;
   isLastMoveSquare: boolean;
   isLegalTarget: boolean;
+  isCaptureTarget: boolean;
   isHoveredLegalTarget: boolean;
   isPlaceTarget: boolean;
   isOwnedPiece: boolean;
@@ -69,6 +75,7 @@ const BoardCell = memo(function BoardCell({
   isSelected,
   isLastMoveSquare,
   isLegalTarget,
+  isCaptureTarget,
   isHoveredLegalTarget,
   isPlaceTarget,
   isOwnedPiece,
@@ -117,10 +124,19 @@ const BoardCell = memo(function BoardCell({
         />
       ) : null}
       {isHoveredLegalTarget ? (
-        <span className="pointer-events-none absolute inset-0 ring-[3px] ring-inset ring-[#8fcea2]/80" />
+        <span
+          data-hovered-legal-target={square}
+          className="pointer-events-none absolute inset-0 ring-[3px] ring-inset ring-[#8fcea2]/80"
+        />
+      ) : null}
+      {isCaptureTarget ? (
+        <span
+          data-capture-target={square}
+          className="pointer-events-none absolute inset-0 ring-[3px] ring-inset ring-[#d94f70]/85"
+        />
       ) : null}
       {isSelected ? (
-        <span className="pointer-events-none absolute inset-[8%] rounded-[10%] border border-app-purple-soft/65" />
+        <span data-selected-square={square} className="pointer-events-none absolute inset-0" />
       ) : null}
 
       {piece ? (
@@ -146,7 +162,10 @@ const BoardCell = memo(function BoardCell({
 
       {!piece && isLegalTarget ? (
         <span className="pointer-events-none absolute inset-0 grid place-items-center">
-          <span className="h-5 w-5 rounded-full bg-[#5f9d73]/90" />
+          <span
+            data-legal-target-dot={square}
+            className="h-5 w-5 rounded-full bg-[#5f9d73]/90"
+          />
         </span>
       ) : null}
     </button>
@@ -223,18 +242,37 @@ function parseBoardPieces(fen: string): Record<string, BoardPiece> {
   return pieceBySquare;
 }
 
-function deriveLegalTargets(fen: string, fromSquare: string | null): Set<string> {
-  if (!fromSquare) return new Set();
+function deriveLegalMoves(fen: string, fromSquare: string | null): LegalMoveMap {
+  if (!fromSquare) {
+    return {
+      targets: new Set(),
+      captures: new Set(),
+    };
+  }
 
   const chess = new Chess();
   try {
     chess.load(fen);
   } catch {
-    return new Set();
+    return {
+      targets: new Set(),
+      captures: new Set(),
+    };
   }
 
-  const moves = chess.moves({ square: fromSquare as any, verbose: true }) as Array<{ to: string }>;
-  return new Set(moves.map((move) => move.to));
+  const moves = chess.moves({
+    square: fromSquare as any,
+    verbose: true,
+  }) as Array<{ to: string; captured?: string; flags: string }>;
+
+  return {
+    targets: new Set(moves.map((move) => move.to)),
+    captures: new Set(
+      moves
+        .filter((move) => Boolean(move.captured) || move.flags.includes("e"))
+        .map((move) => move.to),
+    ),
+  };
 }
 
 export const BoardSurface = memo(function BoardSurface({
@@ -341,10 +379,12 @@ export const BoardSurface = memo(function BoardSurface({
   const snapshotPieces = useMemo(() => parseBoardPieces(snapshot.fen), [snapshot.fen]);
   const pieces = useMemo(() => parseBoardPieces(displayFen), [displayFen]);
   const moveSourceSquare = draggedSquare ?? selectedSquare;
-  const legalTargets = useMemo(
-    () => deriveLegalTargets(snapshot.fen, moveSourceSquare),
+  const legalMoves = useMemo(
+    () => deriveLegalMoves(snapshot.fen, moveSourceSquare),
     [snapshot.fen, moveSourceSquare],
   );
+  const legalTargets = legalMoves.targets;
+  const captureTargets = legalMoves.captures;
   const canInteract =
     snapshot.status === "active" &&
     Boolean(playerColor) &&
@@ -801,6 +841,7 @@ export const BoardSurface = memo(function BoardSurface({
         isSelected={selectedSquare === square}
         isLastMoveSquare={lastMoveSquares.has(square)}
         isLegalTarget={legalTargets.has(square)}
+        isCaptureTarget={captureTargets.has(square)}
         isHoveredLegalTarget={
           hoveredDropSquare === square && draggedSquare !== null && legalTargets.has(square)
         }

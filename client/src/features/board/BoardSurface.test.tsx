@@ -6,6 +6,7 @@ import { BoardSurface } from "./BoardSurface";
 
 const START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 const PROMOTION_FEN = "k7/4P3/8/8/8/8/8/7K w - - 0 1";
+const CAPTURE_FEN = "4k3/8/8/3p4/4P3/8/8/4K3 w - - 0 1";
 
 function makeSnapshot(fen: string = START_FEN) {
   return {
@@ -129,7 +130,7 @@ describe("BoardSurface", () => {
     await user.click(sourceSquare);
 
     expect(sourceSquare.className).toContain("ring-[3px]");
-    expect(sourceSquare.querySelector(".border-app-purple-soft\\/65")).not.toBeNull();
+    expect(sourceSquare.querySelector('[data-selected-square="e2"]')).not.toBeNull();
   });
 
   it("dispatches move intent when piece is dragged to a legal square", () => {
@@ -315,7 +316,7 @@ describe("BoardSurface", () => {
     expect(piece.className).not.toContain("opacity-0");
   });
 
-  it("renders darker green legal move dots and square drop highlight styling", async () => {
+  it("renders themed legal move dots and square drop highlight styling", async () => {
     const user = userEvent.setup();
 
     render(
@@ -329,7 +330,7 @@ describe("BoardSurface", () => {
 
     await user.click(screen.getByRole("button", { name: "e2" }));
 
-    const legalDot = screen.getByRole("button", { name: "e4" }).querySelector(".bg-\\[\\#5f9d73\\]\\/90");
+    const legalDot = screen.getByRole("button", { name: "e4" }).querySelector('[data-legal-target-dot="e4"]');
     expect(legalDot).not.toBeNull();
 
     const piece = within(screen.getByRole("button", { name: "e2" })).getByRole("img", { name: "white p" });
@@ -338,8 +339,31 @@ describe("BoardSurface", () => {
     fireEvent.pointerMove(window, { pointerId: 1, clientX: 30, clientY: 30 });
     fireEvent.mouseEnter(targetSquare);
 
-    const hoverHighlight = targetSquare.querySelector(".ring-\\[3px\\]");
+    const hoverHighlight = targetSquare.querySelector('[data-hovered-legal-target="e4"]');
     expect(hoverHighlight).not.toBeNull();
+  });
+
+  it("renders capture targets with red square highlights instead of quiet-move dots", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <BoardSurface
+        snapshot={makeSnapshot(CAPTURE_FEN)}
+        orientation="white"
+        playerColor="white"
+        onMoveIntent={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "e4" }));
+
+    const captureSquare = screen.getByRole("button", { name: "d5" });
+    expect(captureSquare.querySelector('[data-capture-target="d5"]')).not.toBeNull();
+    expect(captureSquare.querySelector('[data-legal-target-dot="d5"]')).toBeNull();
+
+    const quietSquare = screen.getByRole("button", { name: "e5" });
+    expect(quietSquare.querySelector('[data-legal-target-dot="e5"]')).not.toBeNull();
+    expect(quietSquare.querySelector('[data-capture-target="e5"]')).toBeNull();
   });
 
   it("handles promotion path with queen promotion intent", async () => {
